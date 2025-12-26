@@ -1,21 +1,19 @@
 import React from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { CheckCircle, MapPin, Clock, Receipt, ArrowRight } from "lucide-react";
+import { CheckCircle, Truck, Clock, Receipt, ArrowRight, Phone } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useOrder } from "@/contexts/OrderContext";
 
 const OrderConfirmation = () => {
   const { orderId } = useParams();
   const [searchParams] = useSearchParams();
   const orderNumber = searchParams.get('order_number') || orderId;
   const { t, isRTL } = useLanguage();
-  const { orderType, selectedBranch } = useOrder();
 
-  const estimatedTime = orderType === 'delivery' ? '30-45' : '15-20';
+  const estimatedTime = '30-45';
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -59,24 +57,31 @@ const OrderConfirmation = () => {
                 </div>
               </div>
 
-              {/* Location */}
+              {/* Delivery Info */}
               <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
                 <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                  <MapPin className="h-6 w-6 text-primary" />
+                  <Truck className="h-6 w-6 text-primary" />
                 </div>
                 <div className={isRTL ? 'text-right' : ''}>
                   <p className="text-sm text-muted-foreground">
-                    {orderType === 'delivery' 
-                      ? (isRTL ? 'التوصيل إلى' : 'Delivering to')
-                      : (isRTL ? 'الاستلام من' : 'Pickup from')
-                    }
+                    {isRTL ? 'التوصيل إلى' : 'Delivering to'}
                   </p>
                   <p className="font-medium">
-                    {orderType === 'delivery' 
-                      ? (isRTL ? 'عنوانك المحدد' : 'Your delivery address')
-                      : (isRTL ? selectedBranch?.name_ar : selectedBranch?.name)
-                    }
+                    {isRTL ? 'عنوانك المحدد' : 'Your delivery address'}
                   </p>
+                </div>
+              </div>
+
+              {/* Contact */}
+              <div className={`flex items-center gap-4 p-4 bg-muted rounded-xl ${isRTL ? 'flex-row-reverse' : ''}`}>
+                <Phone className="h-5 w-5 text-muted-foreground" />
+                <div className={isRTL ? 'text-right' : ''}>
+                  <p className="text-sm">
+                    {isRTL ? 'هل تحتاج مساعدة؟ اتصل بنا' : 'Need help? Call us'}
+                  </p>
+                  <a href="tel:+96594745424" className="font-medium text-primary hover:underline">
+                    +965 9474 5424
+                  </a>
                 </div>
               </div>
             </CardContent>
