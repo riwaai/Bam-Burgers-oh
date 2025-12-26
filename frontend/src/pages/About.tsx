@@ -1,119 +1,127 @@
+import React from "react";
+import { ChefHat, Heart, Leaf, Award } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Card, CardContent } from "@/components/ui/card";
-import { Award, Clock, Heart, Users } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const About = () => {
-  const stats = [
-    { number: "5+", label: "Years of Service", icon: Clock },
-    { number: "50K+", label: "Happy Customers", icon: Users },
-    { number: "100+", label: "Menu Items", icon: Heart },
-    { number: "15", label: "Awards Won", icon: Award },
+  const { t, isRTL } = useLanguage();
+
+  const values = [
+    {
+      icon: ChefHat,
+      title: isRTL ? 'مصنوع بعناية' : 'Crafted with Care',
+      description: isRTL 
+        ? 'كل برجر يُصنع بعناية باستخدام وصفاتنا المميزة'
+        : 'Every burger is handcrafted using our signature recipes'
+    },
+    {
+      icon: Leaf,
+      title: isRTL ? 'مكونات طازجة' : 'Fresh Ingredients',
+      description: isRTL
+        ? 'نستخدم فقط المكونات الطازجة من أفضل الموردين'
+        : 'We use only the freshest ingredients from trusted suppliers'
+    },
+    {
+      icon: Heart,
+      title: isRTL ? 'مصنوع بحب' : 'Made with Love',
+      description: isRTL
+        ? 'شغفنا بالطعام الجيد يظهر في كل وجبة نقدمها'
+        : 'Our passion for great food shows in every meal we serve'
+    },
+    {
+      icon: Award,
+      title: isRTL ? 'جودة متميزة' : 'Premium Quality',
+      description: isRTL
+        ? 'نلتزم بأعلى معايير الجودة في كل ما نقدمه'
+        : 'We maintain the highest quality standards in everything we do'
+    },
   ];
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
 
-      <main className="flex-1 pt-24 pb-16">
+      <main className="flex-1 pt-28 pb-16">
         {/* Hero */}
-        <section className="bg-card py-16">
+        <section className="relative py-20 bg-primary">
           <div className="container mx-auto px-4 text-center">
-            <h1 className="text-4xl md:text-5xl font-bold font-serif mb-4">
-              About <span className="text-primary">FastBite</span>
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+              {isRTL ? 'عن بام برجرز' : 'About Bam Burgers'}
             </h1>
-            <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-              We're passionate about serving delicious, high-quality fast food that brings joy to every bite.
+            <p className="text-white/80 max-w-2xl mx-auto text-lg">
+              {isRTL 
+                ? 'نقدم أفضل برجر في الكويت منذ عام 2020. نؤمن بالجودة والطعم والخدمة المتميزة'
+                : 'Serving the best burgers in Kuwait since 2020. We believe in quality, taste, and exceptional service.'
+              }
             </p>
           </div>
         </section>
 
-        <div className="container mx-auto px-4 py-12">
-          {/* Story */}
-          <section className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-16">
-            <div className="space-y-6">
-              <h2 className="text-3xl font-bold font-serif">
-                Our <span className="text-primary">Story</span>
+        {/* Story */}
+        <section className="py-16">
+          <div className="container mx-auto px-4">
+            <div className="max-w-3xl mx-auto text-center">
+              <h2 className="text-3xl font-bold mb-6">
+                {isRTL ? 'قصتنا' : 'Our Story'}
               </h2>
-              <p className="text-muted-foreground">
-                FastBite was founded in 2020 with a simple mission: to serve fast food that doesn't compromise on quality. 
-                We believe that quick service and great taste can go hand in hand.
-              </p>
-              <p className="text-muted-foreground">
-                Our chefs use only the freshest ingredients, sourced locally whenever possible. 
-                Every burger, sandwich, and side dish is prepared with care and attention to detail.
-              </p>
-              <p className="text-muted-foreground">
-                Today, we're proud to serve thousands of satisfied customers who trust us for their 
-                favorite comfort food. Join our family and taste the FastBite difference!
+              <p className={`text-muted-foreground leading-relaxed ${isRTL ? 'text-right' : ''}`}>
+                {isRTL 
+                  ? 'بدأت رحلة بام برجرز من حب بسيط للبرجر الجيد. أردنا أن نقدم شيئاً مختلفاً - برجر مصنوع بعناية من مكونات طازجة ووصفات مميزة. اليوم، نفخر بخدمة آلاف العملاء الذين يشاركوننا شغفنا بالطعام الجيد.'
+                  : 'Bam Burgers started from a simple love for great burgers. We wanted to offer something different - burgers crafted with care using fresh ingredients and unique recipes. Today, we\'re proud to serve thousands of customers who share our passion for good food.'
+                }
               </p>
             </div>
-            <div className="bg-muted aspect-video rounded-lg flex items-center justify-center">
-              <div className="text-center text-muted-foreground">
-                <Users className="h-16 w-16 mx-auto mb-2" />
-                <p>Our Team</p>
-              </div>
-            </div>
-          </section>
+          </div>
+        </section>
 
-          {/* Stats */}
-          <section className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-16">
-            {stats.map((stat) => {
-              const Icon = stat.icon;
-              return (
-                <Card key={stat.label} className="text-center">
-                  <CardContent className="pt-6 space-y-2">
-                    <Icon className="h-8 w-8 mx-auto text-primary" />
-                    <p className="text-3xl font-bold text-primary">{stat.number}</p>
-                    <p className="text-sm text-muted-foreground">{stat.label}</p>
+        {/* Values */}
+        <section className="py-16 bg-card">
+          <div className="container mx-auto px-4">
+            <h2 className="text-3xl font-bold text-center mb-12">
+              {isRTL ? 'قيمنا' : 'Our Values'}
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {values.map((value, index) => (
+                <Card key={index} className="text-center hover:shadow-lg transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                      <value.icon className="h-8 w-8 text-primary" />
+                    </div>
+                    <h3 className="font-semibold text-lg mb-2">{value.title}</h3>
+                    <p className="text-muted-foreground text-sm">{value.description}</p>
                   </CardContent>
                 </Card>
-              );
-            })}
-          </section>
-
-          {/* Values */}
-          <section className="text-center">
-            <h2 className="text-3xl font-bold font-serif mb-8">
-              Our <span className="text-primary">Values</span>
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <Card className="p-6">
-                <CardContent className="space-y-4">
-                  <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
-                    <Heart className="h-8 w-8 text-primary" />
-                  </div>
-                  <h3 className="text-xl font-semibold">Quality First</h3>
-                  <p className="text-muted-foreground">
-                    We never compromise on the quality of our ingredients or preparation methods.
-                  </p>
-                </CardContent>
-              </Card>
-              <Card className="p-6">
-                <CardContent className="space-y-4">
-                  <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
-                    <Clock className="h-8 w-8 text-primary" />
-                  </div>
-                  <h3 className="text-xl font-semibold">Speed & Efficiency</h3>
-                  <p className="text-muted-foreground">
-                    Quick service without sacrificing the taste and quality you deserve.
-                  </p>
-                </CardContent>
-              </Card>
-              <Card className="p-6">
-                <CardContent className="space-y-4">
-                  <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
-                    <Users className="h-8 w-8 text-primary" />
-                  </div>
-                  <h3 className="text-xl font-semibold">Customer Focus</h3>
-                  <p className="text-muted-foreground">
-                    Your satisfaction is our priority. We listen, adapt, and improve for you.
-                  </p>
-                </CardContent>
-              </Card>
+              ))}
             </div>
-          </section>
-        </div>
+          </div>
+        </section>
+
+        {/* Image Gallery */}
+        <section className="py-16">
+          <div className="container mx-auto px-4">
+            <h2 className="text-3xl font-bold text-center mb-12">
+              {isRTL ? 'صور من مطبخنا' : 'From Our Kitchen'}
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400',
+                'https://images.unsplash.com/photo-1553979459-d2229ba7433b?w=400',
+                'https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?w=400',
+                'https://images.unsplash.com/photo-1572802419224-296b0aeee0d9?w=400',
+              ].map((img, index) => (
+                <div key={index} className="aspect-square rounded-xl overflow-hidden">
+                  <img 
+                    src={img} 
+                    alt={`Gallery ${index + 1}`}
+                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
       </main>
 
       <Footer />

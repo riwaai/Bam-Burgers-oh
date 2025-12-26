@@ -1,141 +1,189 @@
-import { useState } from "react";
-import { Mail, MapPin, Phone, Send } from "lucide-react";
+import React, { useState } from "react";
+import { MapPin, Phone, Mail, Clock, Send, Loader2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { toast } from "sonner";
 
 const Contact = () => {
+  const { t, isRTL } = useLanguage();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    message: '',
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    // Simulate form submission
+    await new Promise(resolve => setTimeout(resolve, 1500));
     
-    toast.success("Message sent! We'll get back to you soon.");
-    (e.target as HTMLFormElement).reset();
+    toast.success(isRTL ? 'تم إرسال رسالتك بنجاح!' : 'Message sent successfully!');
+    setFormData({ name: '', email: '', phone: '', message: '' });
     setIsSubmitting(false);
   };
 
   const contactInfo = [
-    { icon: MapPin, label: "Address", value: "123 Food Street, Tasty Town, FT 12345" },
-    { icon: Phone, label: "Phone", value: "(555) 123-4567" },
-    { icon: Mail, label: "Email", value: "hello@fastbite.com" },
+    {
+      icon: MapPin,
+      title: isRTL ? 'العنوان' : 'Address',
+      value: t.restaurant.address,
+    },
+    {
+      icon: Phone,
+      title: isRTL ? 'الهاتف' : 'Phone',
+      value: t.restaurant.phone,
+      href: `tel:${t.restaurant.phone}`,
+    },
+    {
+      icon: Mail,
+      title: isRTL ? 'البريد الإلكتروني' : 'Email',
+      value: t.restaurant.email,
+      href: `mailto:${t.restaurant.email}`,
+    },
+    {
+      icon: Clock,
+      title: isRTL ? 'ساعات العمل' : 'Hours',
+      value: t.restaurant.hoursWeekday,
+    },
   ];
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
 
-      <main className="flex-1 pt-24 pb-16">
+      <main className="flex-1 pt-28 pb-16">
         <div className="container mx-auto px-4">
           {/* Header */}
           <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-bold font-serif mb-4">
-              Get in <span className="text-primary">Touch</span>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">
+              {isRTL ? (
+                <>اتصل <span className="text-primary">بنا</span></>
+              ) : (
+                <>Contact <span className="text-primary">Us</span></>
+              )}
             </h1>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Have questions, feedback, or catering inquiries? We'd love to hear from you!
+              {isRTL 
+                ? 'نسعد بالتواصل معك! أرسل لنا رسالة أو قم بزيارتنا في أي وقت'
+                : "We'd love to hear from you! Send us a message or visit us anytime."
+              }
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
+            {/* Contact Info */}
+            <div className="space-y-6">
+              <h2 className={`text-2xl font-bold ${isRTL ? 'text-right' : ''}`}>
+                {isRTL ? 'معلومات التواصل' : 'Get in Touch'}
+              </h2>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {contactInfo.map((info, index) => (
+                  <Card key={index}>
+                    <CardContent className={`p-4 flex items-start gap-4 ${isRTL ? 'flex-row-reverse text-right' : ''}`}>
+                      <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                        <info.icon className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">{info.title}</p>
+                        {info.href ? (
+                          <a href={info.href} className="font-medium hover:text-primary transition-colors">
+                            {info.value}
+                          </a>
+                        ) : (
+                          <p className="font-medium">{info.value}</p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Map */}
+              <div className="h-64 rounded-xl overflow-hidden">
+                <iframe
+                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3479.123456789!2d48.0123456!3d29.3123456!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMjnCsDE4JzQ0LjQiTiA0OMKwMDAnNDQuNCJF!5e0!3m2!1sen!2skw!4v1234567890"
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0 }}
+                  allowFullScreen
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+              </div>
+            </div>
+
             {/* Contact Form */}
             <Card>
-              <CardContent className="p-6">
-                <h2 className="text-2xl font-semibold mb-6">Send us a Message</h2>
+              <CardHeader>
+                <CardTitle className={isRTL ? 'text-right' : ''}>
+                  {isRTL ? 'أرسل لنا رسالة' : 'Send us a Message'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Name</Label>
-                      <Input id="name" placeholder="Your name" required />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input id="email" type="email" placeholder="your@email.com" required />
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="name">{isRTL ? 'الاسم' : 'Name'}</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      required
+                      className={isRTL ? 'text-right' : ''}
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="subject">Subject</Label>
-                    <Input id="subject" placeholder="What's this about?" required />
+                    <Label htmlFor="email">{t.auth.email}</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      required
+                      dir="ltr"
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="message">Message</Label>
+                    <Label htmlFor="phone">{isRTL ? 'الهاتف' : 'Phone'}</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      dir="ltr"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="message">{isRTL ? 'الرسالة' : 'Message'}</Label>
                     <Textarea
                       id="message"
-                      placeholder="Tell us what's on your mind..."
                       rows={5}
+                      value={formData.message}
+                      onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                       required
+                      className={isRTL ? 'text-right' : ''}
                     />
                   </div>
                   <Button type="submit" className="w-full" disabled={isSubmitting}>
                     {isSubmitting ? (
-                      "Sending..."
+                      <><Loader2 className="h-4 w-4 animate-spin mr-2" />{isRTL ? 'جاري الإرسال...' : 'Sending...'}</>
                     ) : (
-                      <>
-                        <Send className="h-4 w-4 mr-2" />
-                        Send Message
-                      </>
+                      <><Send className="h-4 w-4 mr-2" />{isRTL ? 'إرسال' : 'Send Message'}</>
                     )}
                   </Button>
                 </form>
               </CardContent>
             </Card>
-
-            {/* Contact Info */}
-            <div className="space-y-6">
-              <div className="space-y-4">
-                {contactInfo.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <Card key={item.label}>
-                      <CardContent className="flex items-center gap-4 p-4">
-                        <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                          <Icon className="h-6 w-6 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">{item.label}</p>
-                          <p className="font-medium">{item.value}</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-
-              {/* Map Placeholder */}
-              <Card className="overflow-hidden">
-                <div className="aspect-video bg-muted flex items-center justify-center">
-                  <div className="text-center text-muted-foreground">
-                    <MapPin className="h-12 w-12 mx-auto mb-2" />
-                    <p>Interactive Map</p>
-                  </div>
-                </div>
-              </Card>
-
-              {/* Hours */}
-              <Card>
-                <CardContent className="p-6">
-                  <h3 className="font-semibold text-lg mb-4">Opening Hours</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Monday - Friday</span>
-                      <span>10:00 AM - 10:00 PM</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Saturday - Sunday</span>
-                      <span>11:00 AM - 11:00 PM</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
           </div>
         </div>
       </main>
