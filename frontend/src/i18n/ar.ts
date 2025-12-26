@@ -233,11 +233,10 @@ export const ar: Translations = {
 
   // Footer
   footer: {
-    description: "نقدم برجر لذيذ بمكونات عالية الجودة في الكويت. طازج، سريع، ومميز!",
+    description: "نقدم برجر لذيذ بمكونات عالية الجودة في الكويت. طازج، سريع، ومميز! توصيل فقط.",
     quickLinks: "روابط سريعة",
     ourMenu: "قائمتنا",
     aboutUs: "من نحن",
-    contactUs: "اتصل بنا",
     loyaltyProgram: "برنامج الولاء",
     contact: "اتصل بنا",
     hours: "أوقات العمل",
