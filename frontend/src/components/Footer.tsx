@@ -1,7 +1,10 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { MapPin, Phone, Mail, Clock, Facebook, Instagram, Twitter } from "lucide-react";
+import { Phone, Clock, Facebook, Instagram, Twitter } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+
+// Logo URL
+const LOGO_URL = "https://customer-assets.emergentagent.com/job_bam-delivery/artifacts/gxx028af_Logo.png";
 
 const Footer = () => {
   const { t, isRTL } = useLanguage();
@@ -9,10 +12,16 @@ const Footer = () => {
   return (
     <footer className="bg-foreground text-background">
       <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Brand */}
           <div className="space-y-4">
-            <h3 className="text-2xl font-bold text-primary">{t.restaurant.name}</h3>
+            <Link to="/" className="inline-block">
+              <img 
+                src={LOGO_URL} 
+                alt="Bam Burgers" 
+                className="h-16 w-auto"
+              />
+            </Link>
             <p className="text-sm opacity-80">
               {t.footer.description}
             </p>
@@ -44,11 +53,6 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/contact" className="text-sm opacity-80 hover:text-primary hover:opacity-100 transition-all">
-                  {t.footer.contactUs}
-                </Link>
-              </li>
-              <li>
                 <Link to="/loyalty" className="text-sm opacity-80 hover:text-primary hover:opacity-100 transition-all">
                   {t.footer.loyaltyProgram}
                 </Link>
@@ -56,16 +60,10 @@ const Footer = () => {
             </ul>
           </div>
 
-          {/* Contact Info */}
+          {/* Contact & Hours */}
           <div className="space-y-4">
             <h4 className="text-lg font-semibold">{t.footer.contact}</h4>
             <ul className="space-y-3">
-              <li className="flex items-start gap-3">
-                <MapPin className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                <span className="text-sm opacity-80">
-                  {isRTL ? t.restaurant.address : t.restaurant.address}
-                </span>
-              </li>
               <li className="flex items-center gap-3">
                 <Phone className="h-5 w-5 text-primary flex-shrink-0" />
                 <a href={`tel:${t.restaurant.phone}`} className="text-sm opacity-80 hover:text-primary hover:opacity-100 transition-all">
@@ -73,23 +71,12 @@ const Footer = () => {
                 </a>
               </li>
               <li className="flex items-center gap-3">
-                <Mail className="h-5 w-5 text-primary flex-shrink-0" />
-                <a href={`mailto:${t.restaurant.email}`} className="text-sm opacity-80 hover:text-primary hover:opacity-100 transition-all">
-                  {t.restaurant.email}
-                </a>
+                <Clock className="h-5 w-5 text-primary flex-shrink-0" />
+                <span className="text-sm opacity-80">
+                  {t.restaurant.hoursWeekday}
+                </span>
               </li>
             </ul>
-          </div>
-
-          {/* Hours */}
-          <div className="space-y-4">
-            <h4 className="text-lg font-semibold">{t.footer.hours}</h4>
-            <div className="flex items-start gap-3">
-              <Clock className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-              <div className="text-sm opacity-80">
-                <p>{t.restaurant.hoursWeekday}</p>
-              </div>
-            </div>
           </div>
         </div>
 
