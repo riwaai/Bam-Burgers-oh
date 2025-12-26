@@ -1,30 +1,21 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Clock, MapPin, Star, Truck, Flame, Gift } from "lucide-react";
+import { ArrowRight, Clock, Star, Truck, Flame, Gift, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import MenuCard from "@/components/MenuCard";
-import OrderTypeModal from "@/components/OrderTypeModal";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useOrder } from "@/contexts/OrderContext";
 import { menuItems } from "@/data/menuItems";
+
+// Logo URL
+const LOGO_URL = "https://customer-assets.emergentagent.com/job_bam-delivery/artifacts/gxx028af_Logo.png";
 
 const Index = () => {
   const { t, isRTL } = useLanguage();
-  const { showOrderTypeModal, setShowOrderTypeModal, selectedBranch } = useOrder();
 
   const popularItems = menuItems.filter((item) => item.is_popular).slice(0, 4);
-
-  // Show order type modal on first visit
-  useEffect(() => {
-    const hasSeenModal = localStorage.getItem('bam-seen-order-modal');
-    if (!hasSeenModal) {
-      setShowOrderTypeModal(true);
-      localStorage.setItem('bam-seen-order-modal', 'true');
-    }
-  }, []);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -43,6 +34,12 @@ const Index = () => {
         
         <div className="container mx-auto px-4 relative z-10">
           <div className={`max-w-2xl space-y-6 ${isRTL ? 'mr-auto text-right' : 'ml-0'}`}>
+            {/* Logo */}
+            <img 
+              src={LOGO_URL} 
+              alt="Bam Burgers" 
+              className="h-20 md:h-28 w-auto mb-4"
+            />
             <h1 className="text-4xl md:text-6xl font-bold text-white leading-tight">
               {t.hero.title}
               <br />
@@ -200,70 +197,40 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Location */}
+      {/* Order Now CTA */}
       <section className="py-16 bg-card">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div className={`space-y-6 ${isRTL ? 'order-2 text-right' : ''}`}>
-              <h2 className="text-3xl md:text-4xl font-bold">
-                {isRTL ? (
-                  <>اعثر <span className="text-primary">علينا</span></>
-                ) : (
-                  <>Find <span className="text-primary">Us</span></>
-                )}
-              </h2>
-              <p className="text-muted-foreground">
-                {isRTL
-                  ? 'قم بزيارتنا في موقعنا المريح. نوفر خيارات تناول الطعام في المكان والاستلام'
-                  : 'Visit us at our convenient location. We offer both dine-in and takeout options.'
-                }
-              </p>
-              <div className="space-y-4">
-                <div className={`flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                    <MapPin className="h-5 w-5 text-primary" />
-                  </div>
-                  <span>{isRTL ? selectedBranch?.address_ar : selectedBranch?.address}</span>
-                </div>
-                <div className={`flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                    <Clock className="h-5 w-5 text-primary" />
-                  </div>
-                  <span>{t.restaurant.hoursWeekday}</span>
-                </div>
-              </div>
-              <Link to="/contact">
-                <Button variant="outline" className="group">
-                  {isRTL ? 'احصل على الاتجاهات' : 'Get Directions'}
-                  <ArrowRight className={`h-4 w-4 transition-transform group-hover:translate-x-1 ${isRTL ? 'mr-2 rotate-180 group-hover:-translate-x-1' : 'ml-2'}`} />
+          <div className="max-w-3xl mx-auto text-center">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              {isRTL ? (
+                <>جاهز <span className="text-primary">للطلب؟</span></>
+              ) : (
+                <>Ready to <span className="text-primary">Order?</span></>
+              )}
+            </h2>
+            <p className="text-muted-foreground mb-8">
+              {isRTL
+                ? 'اطلب الآن واحصل على توصيل سريع لباب منزلك'
+                : 'Order now and get fast delivery right to your doorstep'
+              }
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <Link to="/menu">
+                <Button size="lg" className="text-lg px-8">
+                  {t.hero.orderNow}
+                  <ArrowRight className={`h-5 w-5 ${isRTL ? 'mr-2 rotate-180' : 'ml-2'}`} />
                 </Button>
               </Link>
-            </div>
-            <div className={`${isRTL ? 'order-1' : ''}`}>
-              <div className="bg-muted rounded-2xl aspect-video flex items-center justify-center overflow-hidden">
-                <iframe
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3479.123456789!2d48.0123456!3d29.3123456!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMjnCsDE4JzQ0LjQiTiA0OMKwMDAnNDQuNCJF!5e0!3m2!1sen!2skw!4v1234567890"
-                  width="100%"
-                  height="100%"
-                  style={{ border: 0, minHeight: '300px' }}
-                  allowFullScreen
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  className="rounded-2xl"
-                />
-              </div>
+              <a href={`tel:${t.restaurant.phone}`} className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors">
+                <Phone className="h-5 w-5" />
+                <span className="font-medium">{t.restaurant.phone}</span>
+              </a>
             </div>
           </div>
         </div>
       </section>
 
       <Footer />
-
-      {/* Order Type Modal */}
-      <OrderTypeModal 
-        isOpen={showOrderTypeModal} 
-        onClose={() => setShowOrderTypeModal(false)} 
-      />
     </div>
   );
 };
