@@ -38,13 +38,11 @@ interface OrderContextType {
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
-// Default branch - Bam Burgers Salwa
+// Default branch - Bam Burgers (Delivery Only Kitchen)
 const DEFAULT_BRANCH: Branch = {
   id: '3f9570b2-24d2-4f2d-81d7-25c6b35da76b',
-  name: 'Bam Burgers - Salwa',
-  name_ar: 'بام برجرز - سلوى',
-  address: 'Beside Salwa Co-Op, Co-Op Compound, 103 St, 25409, Kuwait',
-  address_ar: 'بجانب جمعية سلوى التعاونية، مجمع التعاونية، شارع 103، 25409، الكويت',
+  name: 'Bam Burgers',
+  name_ar: 'بام برجرز',
   phone: '+965 9474 5424',
   is_open: true,
   opening_hours: 'Daily 11:00 AM - 1:00 AM',
@@ -55,10 +53,8 @@ const BRANCH_KEY = 'bam-branch';
 const ADDRESS_KEY = 'bam-delivery-address';
 
 export const OrderProvider = ({ children }: { children: ReactNode }) => {
-  const [orderType, setOrderTypeState] = useState<OrderType>(() => {
-    const stored = localStorage.getItem(ORDER_TYPE_KEY);
-    return (stored === 'pickup' || stored === 'delivery') ? stored : 'delivery';
-  });
+  // Always delivery for kitchen-only restaurant
+  const [orderType] = useState<OrderType>('delivery');
 
   const [selectedBranch, setSelectedBranchState] = useState<Branch | null>(() => {
     try {
