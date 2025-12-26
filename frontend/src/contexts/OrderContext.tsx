@@ -78,8 +78,7 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
   const [showBranchModal, setShowBranchModal] = useState(false);
 
   const setOrderType = (type: OrderType) => {
-    setOrderTypeState(type);
-    localStorage.setItem(ORDER_TYPE_KEY, type);
+    // Kitchen only - always delivery
   };
 
   const setSelectedBranch = (branch: Branch) => {
