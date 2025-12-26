@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, ShoppingCart, User, Globe, MapPin, ChevronDown } from "lucide-react";
+import { Menu, X, ShoppingCart, User, Globe, Phone, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -11,22 +11,22 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useCart } from "@/contexts/CartContext";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useOrder } from "@/contexts/OrderContext";
 import { useCustomerAuth } from "@/contexts/CustomerAuthContext";
+
+// Logo URL
+const LOGO_URL = "https://customer-assets.emergentagent.com/job_bam-delivery/artifacts/gxx028af_Logo.png";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
   const { itemCount } = useCart();
   const { language, setLanguage, t, isRTL } = useLanguage();
-  const { selectedBranch, orderType, setShowOrderTypeModal } = useOrder();
   const { isAuthenticated, customer, signOut } = useCustomerAuth();
 
   const navLinks = [
     { name: t.nav.home, path: "/" },
     { name: t.nav.menu, path: "/menu" },
     { name: t.nav.about, path: "/about" },
-    { name: t.nav.contact, path: "/contact" },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -38,22 +38,21 @@ const Navbar = () => {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-md border-b border-border shadow-sm">
       <div className="container mx-auto px-4">
-        {/* Top bar with branch info */}
+        {/* Top bar with phone & hours */}
         <div className="flex items-center justify-between py-2 text-xs border-b border-border/50">
-          <button 
-            onClick={() => setShowOrderTypeModal(true)}
-            className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
-          >
-            <MapPin className="h-3 w-3" />
-            <span className="hidden sm:inline">
-              {isRTL ? selectedBranch?.name_ar : selectedBranch?.name}
+          <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+            <a 
+              href={`tel:${t.restaurant.phone}`}
+              className="flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors"
+            >
+              <Phone className="h-3 w-3" />
+              <span className="hidden sm:inline">{t.restaurant.phone}</span>
+            </a>
+            <span className="flex items-center gap-1 text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              <span className="hidden sm:inline">{isRTL ? 'يومياً 11ص - 1ص' : '11AM - 1AM'}</span>
             </span>
-            <span className="sm:hidden">{selectedBranch?.name?.split(' - ')[1] || 'Salwa'}</span>
-            <span className="text-primary font-medium">
-              • {orderType === 'delivery' ? (isRTL ? 'توصيل' : 'Delivery') : (isRTL ? 'استلام' : 'Pickup')}
-            </span>
-            <ChevronDown className="h-3 w-3" />
-          </button>
+          </div>
           
           <button
             onClick={toggleLanguage}
@@ -67,10 +66,12 @@ const Navbar = () => {
         {/* Main navbar */}
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2">
-            <span className="text-2xl font-bold text-primary font-sans tracking-tight">
-              {t.restaurant.name}
-            </span>
+          <Link to="/" className="flex items-center">
+            <img 
+              src={LOGO_URL} 
+              alt="Bam Burgers" 
+              className="h-12 w-auto"
+            />
           </Link>
 
           {/* Desktop Navigation */}
