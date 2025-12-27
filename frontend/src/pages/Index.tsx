@@ -76,7 +76,47 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Features */}
+      {/* Popular Items - NOW FIRST */}
+      <section className="py-16">
+        <div className="container mx-auto px-4">
+          <div className={`mb-12 ${isRTL ? 'text-right' : 'text-center'}`}>
+            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full mb-4">
+              <Flame className="h-4 w-4" />
+              <span className="text-sm font-medium">{t.menu.popular}</span>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              {isRTL ? (
+                <>الأكثر <span className="text-primary">طلباً</span></>
+              ) : (
+                <>Most <span className="text-primary">Popular</span> Items</>
+              )}
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              {isRTL
+                ? 'الأصناف المفضلة لدى عملائنا - مجربة ومحبوبة من الآلاف'
+                : "Our customers' favorites - tried, tested, and loved by thousands"
+              }
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {popularItems.map((item) => (
+              <MenuCard key={item.id} item={item} />
+            ))}
+          </div>
+
+          <div className="text-center mt-10">
+            <Link to="/menu">
+              <Button variant="outline" size="lg" className="group">
+                {isRTL ? 'عرض القائمة كاملة' : 'View Full Menu'}
+                <ArrowRight className={`h-5 w-5 transition-transform group-hover:translate-x-1 ${isRTL ? 'mr-2 rotate-180 group-hover:-translate-x-1' : 'ml-2'}`} />
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Features - MOVED AFTER POPULAR ITEMS */}
       <section className="py-16 bg-card">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -134,46 +174,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Popular Items */}
-      <section className="py-16">
-        <div className="container mx-auto px-4">
-          <div className={`mb-12 ${isRTL ? 'text-right' : 'text-center'}`}>
-            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full mb-4">
-              <Flame className="h-4 w-4" />
-              <span className="text-sm font-medium">{t.menu.popular}</span>
-            </div>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              {isRTL ? (
-                <>الأكثر <span className="text-primary">طلباً</span></>
-              ) : (
-                <>Most <span className="text-primary">Popular</span> Items</>
-              )}
-            </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              {isRTL
-                ? 'الأصناف المفضلة لدى عملائنا - مجربة ومحبوبة من الآلاف'
-                : "Our customers' favorites - tried, tested, and loved by thousands"
-              }
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {popularItems.map((item) => (
-              <MenuCard key={item.id} item={item} />
-            ))}
-          </div>
-
-          <div className="text-center mt-10">
-            <Link to="/menu">
-              <Button variant="outline" size="lg" className="group">
-                {isRTL ? 'عرض القائمة كاملة' : 'View Full Menu'}
-                <ArrowRight className={`h-5 w-5 transition-transform group-hover:translate-x-1 ${isRTL ? 'mr-2 rotate-180 group-hover:-translate-x-1' : 'ml-2'}`} />
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
       {/* CTA - Loyalty Section */}
       <section className="py-16 bg-primary relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
@@ -198,7 +198,7 @@ const Index = () => {
       </section>
 
       {/* Order Now CTA */}
-      <section className="py-16 bg-card">
+      <section className="py-16 bg-background">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
