@@ -29,6 +29,7 @@ export interface MenuItem {
   prep_time_minutes: number | null;
   sort_order: number;
   status: string;
+  modifier_groups?: ModifierGroup[];
 }
 
 export interface ModifierGroup {
@@ -117,7 +118,7 @@ export function useCategories() {
   return { categories, loading, error };
 }
 
-// Hook to fetch menu items with realtime updates
+// Hook to fetch menu items with their modifier groups
 export function useMenuItems(categoryId?: string) {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -139,9 +140,56 @@ export function useMenuItems(categoryId?: string) {
           query = query.eq('category_id', categoryId);
         }
 
-        const { data, error } = await query;
-        if (error) throw error;
-        setItems(data || []);
+        const { data: itemsData, error: itemsError } = await query;
+        if (itemsError) throw itemsError;
+
+        // Fetch modifier groups for all items
+        const { data: itemModifierGroups, error: imgError } = await supabase
+          .from('item_modifier_groups')
+          .select('item_id, modifier_group_id')
+          .in('item_id', (itemsData || []).map(i => i.id));
+
+        if (imgError) throw imgError;
+
+        // Fetch all modifier groups
+        const { data: modifierGroupsData, error: mgError } = await supabase
+          .from('modifier_groups')
+          .select('*')
+          .eq('tenant_id', TENANT_ID)
+          .eq('status', 'active');
+
+        if (mgError) throw mgError;
+
+        // Fetch all modifiers
+        const { data: modifiersData, error: modError } = await supabase
+          .from('modifiers')
+          .select('*')
+          .eq('status', 'active')
+          .order('sort_order', { ascending: true });
+
+        if (modError) throw modError;
+
+        // Map modifier groups with their modifiers
+        const groupsWithModifiers = (modifierGroupsData || []).map(group => ({
+          ...group,
+          modifiers: (modifiersData || []).filter(m => m.modifier_group_id === group.id)
+        }));
+
+        // Map items with their modifier groups
+        const itemsWithModifiers = (itemsData || []).map(item => {
+          const itemGroupIds = (itemModifierGroups || [])
+            .filter(img => img.item_id === item.id)
+            .map(img => img.modifier_group_id);
+          
+          const itemGroups = groupsWithModifiers.filter(g => itemGroupIds.includes(g.id));
+
+          return {
+            ...item,
+            modifier_groups: itemGroups
+          };
+        });
+
+        setItems(itemsWithModifiers);
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -180,7 +228,7 @@ export function usePopularItems() {
 
     async function fetchItems() {
       try {
-        const { data, error } = await supabase
+        const { data: itemsData, error: itemsError } = await supabase
           .from('items')
           .select('*')
           .eq('tenant_id', TENANT_ID)
@@ -188,8 +236,55 @@ export function usePopularItems() {
           .order('sort_order', { ascending: true })
           .limit(4);
 
-        if (error) throw error;
-        setItems(data || []);
+        if (itemsError) throw itemsError;
+
+        // Fetch modifier groups for these items
+        const { data: itemModifierGroups, error: imgError } = await supabase
+          .from('item_modifier_groups')
+          .select('item_id, modifier_group_id')
+          .in('item_id', (itemsData || []).map(i => i.id));
+
+        if (imgError) throw imgError;
+
+        // Fetch all modifier groups
+        const { data: modifierGroupsData, error: mgError } = await supabase
+          .from('modifier_groups')
+          .select('*')
+          .eq('tenant_id', TENANT_ID)
+          .eq('status', 'active');
+
+        if (mgError) throw mgError;
+
+        // Fetch all modifiers
+        const { data: modifiersData, error: modError } = await supabase
+          .from('modifiers')
+          .select('*')
+          .eq('status', 'active')
+          .order('sort_order', { ascending: true });
+
+        if (modError) throw modError;
+
+        // Map modifier groups with their modifiers
+        const groupsWithModifiers = (modifierGroupsData || []).map(group => ({
+          ...group,
+          modifiers: (modifiersData || []).filter(m => m.modifier_group_id === group.id)
+        }));
+
+        // Map items with their modifier groups
+        const itemsWithModifiers = (itemsData || []).map(item => {
+          const itemGroupIds = (itemModifierGroups || [])
+            .filter(img => img.item_id === item.id)
+            .map(img => img.modifier_group_id);
+          
+          const itemGroups = groupsWithModifiers.filter(g => itemGroupIds.includes(g.id));
+
+          return {
+            ...item,
+            modifier_groups: itemGroups
+          };
+        });
+
+        setItems(itemsWithModifiers);
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -216,41 +311,74 @@ export function usePopularItems() {
   return { items, loading, error };
 }
 
-// Hook to fetch modifier groups
-export function useModifierGroups() {
-  const [groups, setGroups] = useState<ModifierGroup[]>([]);
+// Hook to fetch a single item with its modifiers
+export function useMenuItem(itemId: string | undefined) {
+  const [item, setItem] = useState<MenuItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchGroups() {
+    if (!itemId) {
+      setLoading(false);
+      return;
+    }
+
+    async function fetchItem() {
       try {
-        // Fetch groups
-        const { data: groupsData, error: groupsError } = await supabase
-          .from('modifier_groups')
+        const { data: itemData, error: itemError } = await supabase
+          .from('items')
           .select('*')
-          .eq('tenant_id', TENANT_ID)
-          .eq('status', 'active')
-          .order('sort_order', { ascending: true });
+          .eq('id', itemId)
+          .single();
 
-        if (groupsError) throw groupsError;
+        if (itemError) throw itemError;
 
-        // Fetch modifiers
-        const { data: modifiersData, error: modifiersError } = await supabase
-          .from('modifiers')
-          .select('*')
-          .eq('status', 'active')
-          .order('sort_order', { ascending: true });
+        // Fetch modifier groups for this item
+        const { data: itemModifierGroups, error: imgError } = await supabase
+          .from('item_modifier_groups')
+          .select('modifier_group_id')
+          .eq('item_id', itemId);
 
-        if (modifiersError) throw modifiersError;
+        if (imgError) throw imgError;
 
-        // Combine groups with their modifiers
-        const groupsWithModifiers = (groupsData || []).map(group => ({
-          ...group,
-          modifiers: (modifiersData || []).filter(m => m.modifier_group_id === group.id)
-        }));
+        const groupIds = (itemModifierGroups || []).map(img => img.modifier_group_id);
 
-        setGroups(groupsWithModifiers);
+        if (groupIds.length > 0) {
+          // Fetch modifier groups
+          const { data: modifierGroupsData, error: mgError } = await supabase
+            .from('modifier_groups')
+            .select('*')
+            .in('id', groupIds)
+            .eq('status', 'active');
+
+          if (mgError) throw mgError;
+
+          // Fetch modifiers for these groups
+          const { data: modifiersData, error: modError } = await supabase
+            .from('modifiers')
+            .select('*')
+            .in('modifier_group_id', groupIds)
+            .eq('status', 'active')
+            .order('sort_order', { ascending: true });
+
+          if (modError) throw modError;
+
+          // Map modifier groups with their modifiers
+          const groupsWithModifiers = (modifierGroupsData || []).map(group => ({
+            ...group,
+            modifiers: (modifiersData || []).filter(m => m.modifier_group_id === group.id)
+          }));
+
+          setItem({
+            ...itemData,
+            modifier_groups: groupsWithModifiers
+          });
+        } else {
+          setItem({
+            ...itemData,
+            modifier_groups: []
+          });
+        }
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -258,10 +386,10 @@ export function useModifierGroups() {
       }
     }
 
-    fetchGroups();
-  }, []);
+    fetchItem();
+  }, [itemId]);
 
-  return { groups, loading, error };
+  return { item, loading, error };
 }
 
 // Hook to fetch branch info
