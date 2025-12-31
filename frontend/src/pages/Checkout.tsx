@@ -24,9 +24,10 @@ const Checkout = () => {
   const navigate = useNavigate();
   const { items, subtotal, total, discount, deliveryFee, clearCart } = useCart();
   const { t, isRTL } = useLanguage();
-  const { deliveryAddress } = useOrder();
+  const { orderType, deliveryAddress, selectedBranch } = useOrder();
   const { customer, isAuthenticated } = useCustomerAuth();
 
+  const isPickup = orderType === 'pickup';
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   
