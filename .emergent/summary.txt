@@ -1,0 +1,162 @@
+<analysis>**original_problem_statement:**
+The user wants to build a production-ready, customer-facing website for a fast-food restaurant, Bam Burgers.
+
+**PRODUCT REQUIREMENTS:**
+- **Branding:** Use specific colors (#c31c1c, #faf2f1, #c47071, #d98c94). The design should be premium, modern, clean, and mobile-first.
+- **Core Features:**
+    - Homepage with a hero section.
+    - Branch selector & Order type selector (Pickup/Delivery).
+    - Menu browsing by categories.
+    - Item detail modal with variant selection, modifiers, and special instructions.
+    - Shopping cart functionality.
+    - Customer authentication (Firebase) and guest checkout.
+    - Order confirmation and real-time order tracking page.
+    - Language toggle: English/Arabic with RTL support.
+- **Technical Stack:** Next.js 14, Tailwind CSS, shadcn/ui, Supabase PostgreSQL, JavaScript/React.
+- **Functionality:**
+    - All data (menu, orders, etc.) must be fetched from and sent to Supabase in real-time. No mock data.
+    - Order statuses (, , , , ) should be updated in real-time, controlled from an admin panel/POS.
+    - The website must be deployable on Hostinger.
+- **Recent Changes Requested:**
+    - Re-add the Pickup option with the address: Kitchen Park Salwa- 834C+HH Rumaithiya, kuwait.
+    - Change the hero banner text to OG BURGER MEAL.
+
+**User's preferred language**: English
+
+**what currently exists?**
+A visually complete and responsive frontend application built with Next.js (Vite) and TailwindCSS. The UI for the entire user flow (homepage, menu, item details, cart, checkout, login, order tracking) is in place, including Arabic RTL support and the company logo. However, the application is currently using **static mock data** for menu items and does not have a real connection to the Supabase backend for creating orders or fetching data. The project structure was copied from a reference GitHub repository.
+
+**Last working item**:
+- **Last item agent was working:** The agent was beginning the critical task of migrating the frontend from using mock data to fetching live data from the Supabase database. It queried the database to understand the schema and created new React hooks (, ) and updated the  to handle this transition.
+- **Status:** IN PROGRESS
+- **Agent Testing Done:** N
+- **Which testing method agent to use?** frontend testing agent (After the Supabase data is fully integrated into the UI components, the testing agent should be used to verify that menu items are displayed correctly, items can be added to the cart, and the checkout process can be initiated with real data.)
+- **User Testing Done:** N
+
+**All Pending/In progress Issue list**:
+- **Issue 1: (P0) Missing  Table in Supabase:** The agent's own investigation revealed that the  table, which is critical for handling burger customizations (e.g., patty size, add-ons, sauces), does not exist in the Supabase database. This will block the integration of real menu data into the item detail modal.
+- **Issue 2: (P1) Real-time Order Status is Not Implemented:** The user requires a real-time order tracking system where statuses are updated from a POS/Admin panel. The current  page is a static placeholder.
+
+**Issues Detail:**
+- **Issue 1: Missing  Table in Supabase**
+    - **Attempted fixes:** None. The issue was just discovered.
+    - **Next debug checklist:**
+        1.  Verify if any other related tables are missing (e.g., ).
+        2.  Communicate with the user about the missing table.
+        3.  If authorized, create the  and  tables in Supabase based on the schema defined in the initial problem statement.
+    - **Why fix this issue and what will be achieved with the fix?** Without this table, the application cannot display or process any item customizations (like 'Double Patty' or 'Extra Cheese'), which is a core feature of ordering a burger. Fixing this will unblock the entire menu integration.
+    - **Status:** NOT STARTED
+    - **Is recurring issue?** N
+    - **Should Test frontend/backend/both after fix?** both (Backend for table creation, Frontend for displaying modifiers).
+    - **Blocked on other issue:** None. This is a primary blocker.
+
+- **Issue 2: Real-time Order Status is Not Implemented**
+    - **Attempted fixes:** None.
+    - **Next debug checklist:**
+        1.  Implement Supabase's Realtime subscriptions in the  hook or directly in the  page.
+        2.  The component should listen for changes to the  column of the relevant order in the  table.
+        3.  Update the UI to reflect the new status dynamically.
+    - **Why fix this issue and what will be achieved with the fix?** This implements a key user requirement for a live order tracking experience, which is essential for customer satisfaction.
+    - **Status:** NOT STARTED
+    - **Is recurring issue?** N
+    - **Should Test frontend/backend/both after fix?** both (The frontend must be tested to see status updates. The backend logic that updates the status would need to be simulated or tested).
+    - **Blocked on other issue:** Blocked on Task 1: Complete Supabase Menu Data Integration and Task 2: Implement Order Creation. An order must be created before it can be tracked.
+
+**In progress Task List**:
+- **Task 1: (P0) Complete Supabase Menu Data Integration**
+    - **Where to resume:** The hooks () have been created. The next step is to integrate these hooks into the UI pages ( for Most Popular Items and  for the full menu) to replace the mock data with live data from Supabase.
+    - **What will be achieved with this?** The website will display the actual menu from the restaurant's database instead of hardcoded examples.
+    - **Status:** IN PROGRESS
+    - **Should Test frontend/backend/both after fix?** frontend
+    - **Blocked on something:** Blocked on Issue 1: Missing Table for full functionality.
+
+**Upcoming and Future Tasks**
+- **Upcoming Tasks:**
+    - **(P0) Implement Order Creation ():** Update the  page to send the final cart contents and customer information to the Supabase  table upon submission.
+    - **(P1) Re-add Pickup Option:** Update the UI in , , and the footer to include the Pickup option and display the restaurant's address.
+    - **(P1) Update Hero Text:** Change the banner text on  to OG BURGER MEAL.
+    - **(P2) Ensure Hostinger Deployment Compatibility:** Investigate Hostinger's deployment requirements for a Vite-based Node.js application and make any necessary configuration changes, potentially removing Vercel-specific files if they conflict.
+
+**Completed work in this session**
+- Built a complete, responsive, and visually styled frontend UI from a reference project.
+- Implemented Bam Burgers' branding, including logo and color scheme.
+- Set up multi-language support for English and Arabic (with RTL).
+- Created all necessary pages and components for the user flow (Home, Menu, Modals, Cart, etc.) using mock data.
+- Handled multiple rounds of user feedback, including making the site delivery-only and then re-ordering homepage sections.
+- Created a  file to address Vercel deployment issues.
+- Began the pivot to a data-driven app by inspecting the Supabase DB and creating initial data-fetching hooks.
+
+**Earlier issues found/mentioned but not fixed**
+- **Issue 1:  table is missing in Supabase.** The agent discovered this while inspecting the database but did not take action or report it before starting to create data-fetching logic.
+
+**Code Architecture**
+
+
+**Key Technical Concepts**
+- **Framework:** Next.js 14 with Vite
+- **Styling:** Tailwind CSS, shadcn/ui
+- **State Management:** React Context API
+- **Language:** TypeScript/React
+- **Database:** Supabase (PostgreSQL) - Direct client-side querying
+- **Authentication:** Firebase (planned for customer login)
+
+**key DB schema**
+- : {id, tenant_id, name, ...}
+- : {id, tenant_id, name, description, price, image_url, category_id, ...}
+- : {id, tenant_id, customer_name, status, total, ...}
+- : **MISSING** (Expected: {id, item_id, name, price_modifier, ...})
+- : **MISSING** (Expected: {id, name, selection_type, ...})
+
+**changes in tech stack**
+- The project was set up using Next.js with Vite, based on the reference Lovable project, which deviates from a standard Next.js setup but is functional.
+
+**All files of reference**
+- : Newly created hook to fetch menu categories and items from Supabase.
+- : Newly created hook placeholder for order creation and tracking.
+- : Overwritten to manage order state (delivery/pickup).
+- : The main homepage, needs to be updated to use .
+- : The menu page, needs to be updated to use .
+- : The checkout page, needs to be updated to create orders in Supabase.
+- : The order tracking page, needs to be updated for real-time status.
+- : Created to assist with Vercel deployment.
+
+**Critical Info for New Agent**
+- The project has pivoted from a UI/mockup phase to a full-stack implementation phase. The user's priority is now a fully functional, data-driven application with no mock data.
+- The most critical blocker is the **missing  and  tables** in the Supabase database. You cannot complete the menu integration without addressing this. You must either create the tables as per the original requirements or confirm the schema with the user.
+- The user is in a hurry and has specifically asked not to waste time/tokens on unnecessary testing. Focus on delivering the requested features.
+- The user has mentioned deployment issues on Hostinger. While a  was added, you may need to research and provide a more platform-agnostic build configuration or specific instructions for Hostinger.
+
+**documents and test reports created in this job**
+- 
+
+**Last 10 User Messages and any pending HUMAN messages**
+1.  **User:** Requests to change the layout of the homepage, fix a scrolling issue, and asks for help with a Vercel 404 error.
+2.  **Agent:** Implements the layout change, adds a scroll-to-top component, and creates a  to fix the deployment issue.
+3.  **User:** Asks to add the pickup option back with a new address.
+4.  **User:** Provides a GitHub link to API docs.
+5.  **User:** Re-iterates the request to add pickup, provides a new address, and asks to change the hero banner text.
+6.  **User:** **CRITICAL:** Demands that all mock data be replaced with real data from Supabase, that order tracking be made real-time and controlled by an admin panel, and that the site be deployable on Hostinger. They re-provide all Supabase credentials and state they want to finalize the website now.
+7.  **Agent:** Acknowledges the requests and begins inspecting the Supabase database to understand the schema.
+8.  **Agent:** Successfully queries  and  tables from Supabase.
+9.  **Agent:** Discovers that the  table returns data but notes that  table cannot be found.
+10. **Agent:** Creates new hooks (, ) and updates  to prepare for the data integration.
+
+**Project Health Check:**
+- **Broken:** Backend connectivity, Order creation, Real-time order tracking, Display of item modifiers.
+- **Mocked:** All menu data currently displayed on the website.
+
+**3rd Party Integrations**
+- **Supabase (Database & Realtime):** Credentials provided. Used for storing all application data.
+- **Firebase (Authentication):** Credentials provided. Intended for customer sign-up and login.
+
+**Testing status**
+- **Testing agent used after significant changes:** NO
+- **Troubleshoot agent used after agent stuck in loop:** NO
+- **Test files created:** None
+- **Known regressions:** The Pickup feature was implemented, then removed, and now needs to be re-implemented.
+
+**Credentials to test flow:**
+- Supabase and Firebase credentials have been provided by the user and are in .
+
+**What agent forgot to execute**
+- The agent discovered the critical issue of the missing  table in Supabase but did not stop to address it or inform the user. It proceeded with creating data-fetching logic that will inevitably fail or be incomplete without the modifier data. This needs to be the first action item for the next agent.</analysis>
