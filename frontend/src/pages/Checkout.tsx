@@ -300,7 +300,8 @@ const Checkout = () => {
                   </CardContent>
                 </Card>
 
-                {/* Delivery Address */}
+                {/* Delivery Address - Only for delivery orders */}
+                {!isPickup && (
                 <Card>
                   <CardHeader>
                     <CardTitle className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
@@ -389,6 +390,7 @@ const Checkout = () => {
                     </div>
                   </CardContent>
                 </Card>
+                )}
 
                 {/* Payment Method */}
                 <Card>
