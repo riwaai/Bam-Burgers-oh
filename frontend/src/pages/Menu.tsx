@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Search } from "lucide-react";
+import { Search, Loader2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import MenuCard from "@/components/MenuCard";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useOrder } from "@/contexts/OrderContext";
-import { menuItems, categories } from "@/data/menuItems";
+import { useCategories, useMenuItems } from "@/hooks/useSupabaseMenu";
 
 const Menu = () => {
   const { t, isRTL } = useLanguage();
@@ -16,28 +16,35 @@ const Menu = () => {
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Filter items by category and search
+  // Fetch from Supabase
+  const { categories: dbCategories, loading: categoriesLoading } = useCategories();
+  const { items: dbItems, loading: itemsLoading } = useMenuItems(activeCategory);
+
+  // Build categories array with "All" option
+  const categories = useMemo(() => {
+    const allOption = { 
+      id: 'all', 
+      name_en: 'All Items', 
+      name_ar: 'جميع الأصناف',
+      sort_order: 0 
+    };
+    return [allOption, ...dbCategories];
+  }, [dbCategories]);
+
+  // Filter items by search
   const filteredItems = useMemo(() => {
-    let items = menuItems;
+    if (!searchQuery.trim()) return dbItems;
     
-    // Filter by category
-    if (activeCategory !== "all") {
-      items = items.filter((item) => item.category_id === activeCategory);
-    }
-    
-    // Filter by search
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      items = items.filter((item) => 
-        item.name.toLowerCase().includes(query) ||
-        item.name_ar.includes(query) ||
-        item.description.toLowerCase().includes(query) ||
-        item.description_ar.includes(query)
-      );
-    }
-    
-    return items;
-  }, [activeCategory, searchQuery]);
+    const query = searchQuery.toLowerCase();
+    return dbItems.filter((item) => 
+      item.name_en.toLowerCase().includes(query) ||
+      item.name_ar.includes(query) ||
+      (item.description_en && item.description_en.toLowerCase().includes(query)) ||
+      (item.description_ar && item.description_ar.includes(query))
+    );
+  }, [dbItems, searchQuery]);
+
+  const loading = categoriesLoading || itemsLoading;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -88,14 +95,19 @@ const Menu = () => {
                   }`}
                   size="sm"
                 >
-                  {isRTL ? category.name_ar : category.name}
+                  {isRTL ? category.name_ar : category.name_en}
                 </Button>
               ))}
             </div>
           </div>
 
-          {/* Menu Grid */}
-          {filteredItems.length > 0 ? (
+          {/* Loading State */}
+          {loading ? (
+            <div className="flex justify-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : filteredItems.length > 0 ? (
+            /* Menu Grid */
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredItems.map((item) => (
                 <MenuCard key={item.id} item={item} />
