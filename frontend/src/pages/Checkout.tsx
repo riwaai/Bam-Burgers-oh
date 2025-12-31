@@ -69,7 +69,8 @@ const Checkout = () => {
       return;
     }
 
-    if (!formData.area || !formData.block || !formData.building) {
+    // Only require address for delivery
+    if (!isPickup && (!formData.area || !formData.block || !formData.building)) {
       toast.error(isRTL ? 'يرجى إدخال عنوان التوصيل' : 'Please enter delivery address');
       return;
     }
@@ -85,8 +86,8 @@ const Checkout = () => {
     try {
       const orderNumber = generateOrderNumber();
       
-      // Build delivery address object
-      const addressObj = {
+      // Build delivery address object (only for delivery orders)
+      const addressObj = isPickup ? null : {
         area: formData.area,
         block: formData.block,
         street: formData.street,
@@ -120,7 +121,7 @@ const Checkout = () => {
           branch_id: BRANCH_ID,
           customer_id: customer?.id || null,
           order_number: orderNumber,
-          order_type: 'delivery',
+          order_type: isPickup ? 'pickup' : 'delivery',
           status: 'pending',
           customer_name: `${formData.firstName} ${formData.lastName}`.trim(),
           customer_phone: formData.phone,
@@ -129,10 +130,10 @@ const Checkout = () => {
           items: orderItems,
           subtotal,
           discount,
-          delivery_fee: deliveryFee,
+          delivery_fee: isPickup ? 0 : deliveryFee,
           tax: 0, // Kuwait has no food tax
           service_charge: 0,
-          total,
+          total: isPickup ? (subtotal - discount) : total,
           payment_method: paymentMethod === 'cash' ? 'cash_on_delivery' : 'online',
           payment_status: paymentMethod === 'cash' ? 'pending' : 'pending',
           notes: formData.notes || null,
@@ -142,11 +143,7 @@ const Checkout = () => {
 
       if (error) {
         console.error('Order error:', error);
-        // Create a mock order ID for demo
-        const mockOrderId = `mock-${Date.now()}`;
-        toast.success(isRTL ? 'تم تقديم الطلب بنجاح!' : 'Order placed successfully!');
-        clearCart();
-        navigate(`/order-confirmation/${mockOrderId}?order_number=${orderNumber}`);
+        toast.error(isRTL ? 'حدث خطأ أثناء تقديم الطلب' : 'Error placing order. Please try again.');
         return;
       }
 
