@@ -142,7 +142,7 @@ const Checkout = () => {
 
       toast.success(isRTL ? 'تم تقديم الطلب بنجاح!' : 'Order placed successfully!');
       clearCart();
-      navigate(`/order-tracking/${orderResult.id}?order_number=${orderResult.order_number}`);
+      navigate(`/track-order/${orderResult.id}?order_number=${orderResult.order_number}`);
 
     } catch (error) {
       console.error('Order error:', error);
