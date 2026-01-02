@@ -18,7 +18,7 @@ import { formatPrice } from "@/hooks/useSupabaseMenu";
 import { toast } from "sonner";
 
 // Backend API URL
-const BACKEND_URL = import.meta.env.REACT_APP_BACKEND_URL || '';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
 type PaymentMethod = 'cash' | 'online';
 
