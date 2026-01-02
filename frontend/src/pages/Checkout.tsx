@@ -97,23 +97,13 @@ const Checkout = () => {
         additional_directions: formData.additionalInfo,
       };
 
-      // Build order items
-      const orderItems = items.map(item => ({
-        menu_item_id: item.menu_item_id,
-        name: item.name,
-        name_ar: item.name_ar,
-        price: item.price,
-        quantity: item.quantity,
-        modifiers: item.modifiers.map(m => ({
-          id: m.modifier.id,
-          name: m.modifier.name,
-          price: m.modifier.price,
-        })),
-        special_instructions: item.special_instructions,
-        total_price: item.total_price,
-      }));
+      // Calculate totals
+      const orderSubtotal = subtotal;
+      const orderDiscount = discount;
+      const orderDeliveryFee = isPickup ? 0 : deliveryFee;
+      const orderTotal = isPickup ? (subtotal - discount) : total;
 
-      // Create order in Supabase
+      // Create order in Supabase (matching exact schema)
       const { data: order, error } = await supabase
         .from('orders')
         .insert({
@@ -122,19 +112,19 @@ const Checkout = () => {
           customer_id: customer?.id || null,
           order_number: orderNumber,
           order_type: isPickup ? 'pickup' : 'delivery',
+          channel: 'website',
           status: 'pending',
           customer_name: `${formData.firstName} ${formData.lastName}`.trim(),
           customer_phone: formData.phone,
           customer_email: formData.email || null,
           delivery_address: addressObj,
-          items: orderItems,
-          subtotal,
-          discount,
-          delivery_fee: isPickup ? 0 : deliveryFee,
-          tax: 0, // Kuwait has no food tax
+          delivery_instructions: formData.additionalInfo || null,
+          subtotal: orderSubtotal,
+          discount_amount: orderDiscount,
+          delivery_fee: orderDeliveryFee,
+          tax_amount: 0,
           service_charge: 0,
-          total: isPickup ? (subtotal - discount) : total,
-          payment_method: paymentMethod === 'cash' ? 'cash_on_delivery' : 'online',
+          total_amount: orderTotal,
           payment_status: paymentMethod === 'cash' ? 'pending' : 'pending',
           notes: formData.notes || null,
         })
@@ -147,9 +137,31 @@ const Checkout = () => {
         return;
       }
 
+      // Now insert order items into order_items table
+      const orderItemsToInsert = items.map(item => ({
+        order_id: order.id,
+        item_id: item.menu_item_id,
+        item_name_en: item.name,
+        item_name_ar: item.name_ar,
+        quantity: item.quantity,
+        unit_price: item.price,
+        total_price: item.total_price,
+        notes: item.special_instructions || null,
+        status: 'pending',
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItemsToInsert);
+
+      if (itemsError) {
+        console.error('Order items error:', itemsError);
+        // Order was created but items failed - still continue
+      }
+
       toast.success(isRTL ? 'تم تقديم الطلب بنجاح!' : 'Order placed successfully!');
       clearCart();
-      navigate(`/order-confirmation/${order.id}?order_number=${orderNumber}`);
+      navigate(`/order-tracking/${order.id}?order_number=${orderNumber}`);
 
     } catch (error) {
       console.error('Order error:', error);
