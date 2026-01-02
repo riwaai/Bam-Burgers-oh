@@ -181,8 +181,14 @@ async def create_order(request: CreateOrderRequest):
         if request.delivery_address:
             address_json = request.delivery_address.dict()
         
-        # Insert order into Supabase using direct SQL via RPC to bypass trigger issues
-        # Since service role bypasses RLS but triggers still run, we'll use a workaround
+        # First, authenticate as the web orders user to get a valid token
+        # This ensures auth.uid() returns a valid UUID in the trigger
+        access_token = await create_order_with_auth()
+        
+        if not access_token:
+            logging.error("Failed to authenticate web orders user")
+            # Fall back to service key approach
+            access_token = SUPABASE_SERVICE_KEY
         
         order_data = {
             'tenant_id': TENANT_ID,
@@ -191,7 +197,6 @@ async def create_order(request: CreateOrderRequest):
             'order_type': request.order_type,
             'channel': 'website',
             'status': 'pending',
-            'user_id': WEB_USER_ID,  # Set explicitly
             'customer_name': request.customer_name,
             'customer_phone': request.customer_phone,
             'customer_email': request.customer_email,
@@ -207,12 +212,12 @@ async def create_order(request: CreateOrderRequest):
             'notes': request.notes,
         }
         
-        # Use httpx to make raw POST request with proper headers
+        # Use the authenticated user's token
         url = f"{SUPABASE_URL}/rest/v1/orders"
         headers = {
             'Content-Type': 'application/json',
-            'apikey': SUPABASE_SERVICE_KEY,
-            'Authorization': f'Bearer {SUPABASE_SERVICE_KEY}',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': f'Bearer {access_token}',
             'Prefer': 'return=representation'
         }
         
@@ -222,18 +227,10 @@ async def create_order(request: CreateOrderRequest):
             if response.status_code >= 400:
                 error_detail = response.json()
                 logging.error(f"Order creation failed: {error_detail}")
-                
-                # If the trigger is causing issues, try alternate approach
-                if 'user_id' in str(error_detail):
-                    # Try creating without user_id and see if there's a default
-                    del order_data['user_id']
-                    response = await http_client.post(url, headers=headers, json=order_data)
-                    
-                    if response.status_code >= 400:
-                        raise HTTPException(
-                            status_code=500, 
-                            detail=f"Failed to create order: {response.json()}"
-                        )
+                raise HTTPException(
+                    status_code=500, 
+                    detail=f"Failed to create order: {error_detail}"
+                )
             
             order_result = response.json()
             
@@ -244,7 +241,7 @@ async def create_order(request: CreateOrderRequest):
             
             order_id = order['id']
             
-            # Insert order items
+            # Insert order items using the same auth token
             if request.items:
                 items_data = []
                 for item in request.items:
@@ -261,7 +258,10 @@ async def create_order(request: CreateOrderRequest):
                     })
                 
                 items_url = f"{SUPABASE_URL}/rest/v1/order_items"
-                await http_client.post(items_url, headers=headers, json=items_data)
+                items_response = await http_client.post(items_url, headers=headers, json=items_data)
+                
+                if items_response.status_code >= 400:
+                    logging.error(f"Order items error: {items_response.text}")
         
         return OrderResponse(
             id=order_id,
