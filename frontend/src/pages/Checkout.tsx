@@ -86,10 +86,8 @@ const Checkout = () => {
     setIsProcessing(true);
 
     try {
-      const orderNumber = generateOrderNumber();
-      
       // Build delivery address object (only for delivery orders)
-      const addressObj = isPickup ? null : {
+      const addressObj = isPickup ? undefined : {
         area: formData.area,
         block: formData.block,
         street: formData.street,
@@ -100,70 +98,59 @@ const Checkout = () => {
       };
 
       // Calculate totals
-      const orderSubtotal = subtotal;
-      const orderDiscount = discount;
       const orderDeliveryFee = isPickup ? 0 : deliveryFee;
       const orderTotal = isPickup ? (subtotal - discount) : total;
 
-      // Create order in Supabase (matching exact schema)
-      const { data: order, error } = await supabase
-        .from('orders')
-        .insert({
-          tenant_id: TENANT_ID,
-          branch_id: BRANCH_ID,
-          customer_id: customer?.id || null,
-          order_number: orderNumber,
-          order_type: isPickup ? 'pickup' : 'delivery',
-          channel: 'website',
-          status: 'pending',
-          customer_name: `${formData.firstName} ${formData.lastName}`.trim(),
-          customer_phone: formData.phone,
-          customer_email: formData.email || null,
-          delivery_address: addressObj,
-          delivery_instructions: formData.additionalInfo || null,
-          subtotal: orderSubtotal,
-          discount_amount: orderDiscount,
-          delivery_fee: orderDeliveryFee,
-          tax_amount: 0,
-          service_charge: 0,
-          total_amount: orderTotal,
-          payment_status: paymentMethod === 'cash' ? 'pending' : 'pending',
-          notes: formData.notes || null,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Order error:', error);
-        toast.error(isRTL ? 'حدث خطأ أثناء تقديم الطلب' : 'Error placing order. Please try again.');
-        return;
-      }
-
-      // Now insert order items into order_items table
-      const orderItemsToInsert = items.map(item => ({
-        order_id: order.id,
+      // Build order items for API
+      const orderItems = items.map(item => ({
         item_id: item.menu_item_id,
         item_name_en: item.name,
-        item_name_ar: item.name_ar,
+        item_name_ar: item.name_ar || item.name,
         quantity: item.quantity,
         unit_price: item.price,
         total_price: item.total_price,
         notes: item.special_instructions || null,
-        status: 'pending',
+        modifiers: item.modifiers?.map(m => ({
+          id: m.modifier?.id,
+          name: m.modifier?.name,
+          price: m.modifier?.price,
+        })) || [],
       }));
 
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItemsToInsert);
+      // Create order via backend API
+      const response = await fetch(`${BACKEND_URL}/api/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          order_type: isPickup ? 'pickup' : 'delivery',
+          customer_name: `${formData.firstName} ${formData.lastName}`.trim(),
+          customer_phone: formData.phone,
+          customer_email: formData.email || undefined,
+          delivery_address: addressObj,
+          delivery_instructions: formData.additionalInfo || undefined,
+          items: orderItems,
+          subtotal: subtotal,
+          discount_amount: discount,
+          delivery_fee: orderDeliveryFee,
+          total_amount: orderTotal,
+          notes: formData.notes || undefined,
+        }),
+      });
 
-      if (itemsError) {
-        console.error('Order items error:', itemsError);
-        // Order was created but items failed - still continue
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Order error:', errorData);
+        toast.error(isRTL ? 'حدث خطأ أثناء تقديم الطلب' : 'Error placing order. Please try again.');
+        return;
       }
+
+      const orderResult = await response.json();
 
       toast.success(isRTL ? 'تم تقديم الطلب بنجاح!' : 'Order placed successfully!');
       clearCart();
-      navigate(`/order-tracking/${order.id}?order_number=${orderNumber}`);
+      navigate(`/order-tracking/${orderResult.id}?order_number=${orderResult.order_number}`);
 
     } catch (error) {
       console.error('Order error:', error);
