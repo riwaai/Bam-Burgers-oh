@@ -254,15 +254,9 @@ async def create_order(request: CreateOrderRequest):
                 error_detail = response.json()
                 logging.error(f"Order creation failed: {error_detail}")
                 
-                # If RLS blocks, try creating via MongoDB as fallback
-                if 'row-level security' in str(error_detail).lower():
-                    logging.info("RLS blocked, creating order in MongoDB as fallback")
-                    return await create_order_mongodb(request, order_number)
-                
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to create order: {error_detail}"
-                )
+                # Fall back to MongoDB on ANY Supabase error
+                logging.info("Supabase order failed, creating order in MongoDB as fallback")
+                return await create_order_mongodb(request, order_number)
             
             order_result = response.json()
             
