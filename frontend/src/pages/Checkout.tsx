@@ -14,9 +14,11 @@ import { useCart } from "@/contexts/CartContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useOrder } from "@/contexts/OrderContext";
 import { useCustomerAuth } from "@/contexts/CustomerAuthContext";
-import { supabase, TENANT_ID, BRANCH_ID } from "@/integrations/supabase/client";
 import { formatPrice } from "@/hooks/useSupabaseMenu";
 import { toast } from "sonner";
+
+// Backend API URL
+const BACKEND_URL = import.meta.env.REACT_APP_BACKEND_URL || '/api';
 
 type PaymentMethod = 'cash' | 'online';
 
