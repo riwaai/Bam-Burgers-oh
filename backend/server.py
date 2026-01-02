@@ -86,14 +86,17 @@ class OrderResponse(BaseModel):
     status: str
     created_at: str
 
-# Helper function for Supabase REST API calls
-async def supabase_request(method: str, endpoint: str, data: dict = None, params: dict = None):
+async def supabase_request(method: str, endpoint: str, data: dict = None, params: dict = None, use_auth: bool = False):
     """Make a request to Supabase REST API using service key"""
     url = f"{SUPABASE_URL}/rest/v1/{endpoint}"
+    
+    # For order creation, we need to authenticate as a user first
+    api_key = SUPABASE_SERVICE_KEY
+    
     headers = {
         'Content-Type': 'application/json',
-        'apikey': SUPABASE_SERVICE_KEY,
-        'Authorization': f'Bearer {SUPABASE_SERVICE_KEY}',
+        'apikey': api_key,
+        'Authorization': f'Bearer {api_key}',
         'Prefer': 'return=representation'
     }
     
@@ -114,6 +117,30 @@ async def supabase_request(method: str, endpoint: str, data: dict = None, params
             raise HTTPException(status_code=response.status_code, detail=response.json())
         
         return response.json() if response.text else None
+
+
+async def create_order_with_auth():
+    """
+    Authenticate as web orders user and return the access token.
+    This is needed because the orders table has a trigger that sets user_id from auth.uid()
+    """
+    url = f"{SUPABASE_URL}/auth/v1/token?grant_type=password"
+    headers = {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+    }
+    data = {
+        'email': 'weborders@bamburgers.com',
+        'password': 'WebOrder@123'
+    }
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.post(url, headers=headers, json=data)
+        if response.status_code == 200:
+            return response.json().get('access_token')
+        else:
+            logging.error(f"Auth error: {response.text}")
+            return None
 
 # Generate order number
 def generate_order_number():
