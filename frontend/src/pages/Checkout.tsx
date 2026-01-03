@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Truck, MapPin, CreditCard, Banknote, Loader2, Store } from "lucide-react";
+import { ArrowLeft, ArrowRight, Truck, MapPin, CreditCard, Banknote, Loader2, Store, Navigation, AlertTriangle } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -16,15 +16,70 @@ import { useOrder } from "@/contexts/OrderContext";
 import { useCustomerAuth } from "@/contexts/CustomerAuthContext";
 import { formatPrice } from "@/hooks/useSupabaseMenu";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { MapContainer, TileLayer, Marker, useMapEvents, Polygon } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix leaflet default marker icon
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
 
 // Backend API URL
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
+// Kuwait center coordinates (Salwa area)
+const KUWAIT_CENTER: [number, number] = [29.3117, 47.9774];
+
 type PaymentMethod = 'cash' | 'online';
+
+interface DeliveryZone {
+  id: string;
+  zone_name: string;
+  coordinates: number[][];
+  delivery_fee: number;
+  min_order_amount: number;
+  status: string;
+}
+
+// Point in polygon check
+function isPointInPolygon(point: [number, number], polygon: number[][]): boolean {
+  const [x, y] = point;
+  let inside = false;
+  
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, yi] = polygon[i];
+    const [xj, yj] = polygon[j];
+    
+    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
+  }
+  
+  return inside;
+}
+
+// Map click handler component
+function LocationMarker({ position, onPositionChange }: { 
+  position: [number, number] | null;
+  onPositionChange: (pos: [number, number]) => void;
+}) {
+  useMapEvents({
+    click(e) {
+      onPositionChange([e.latlng.lat, e.latlng.lng]);
+    },
+  });
+
+  return position ? <Marker position={position} /> : null;
+}
 
 const Checkout = () => {
   const navigate = useNavigate();
-  const { items, subtotal, total, discount, deliveryFee, clearCart } = useCart();
+  const { items, subtotal, total, discount, deliveryFee, clearCart, setDeliveryFee } = useCart();
   const { t, isRTL } = useLanguage();
   const { orderType, deliveryAddress, selectedBranch } = useOrder();
   const { customer, isAuthenticated } = useCustomerAuth();
@@ -32,6 +87,12 @@ const Checkout = () => {
   const isPickup = orderType === 'pickup';
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [mapPosition, setMapPosition] = useState<[number, number] | null>(null);
+  const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
+  const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([]);
+  const [selectedZone, setSelectedZone] = useState<DeliveryZone | null>(null);
+  const [isInDeliveryZone, setIsInDeliveryZone] = useState<boolean | null>(null);
+  const [zoneFee, setZoneFee] = useState<number>(0);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -48,6 +109,119 @@ const Checkout = () => {
     additionalInfo: deliveryAddress?.additional_directions || '',
     notes: '',
   });
+
+  // Fetch delivery zones
+  useEffect(() => {
+    const fetchZones = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('delivery_zones')
+          .select('*')
+          .eq('status', 'active');
+        
+        if (error) throw error;
+        setDeliveryZones(data || []);
+      } catch (err) {
+        console.error('Error fetching zones:', err);
+      }
+    };
+    
+    if (!isPickup) {
+      fetchZones();
+    }
+  }, [isPickup]);
+
+  // Check if selected position is in a delivery zone
+  useEffect(() => {
+    if (!mapPosition || isPickup || deliveryZones.length === 0) {
+      setIsInDeliveryZone(null);
+      setSelectedZone(null);
+      return;
+    }
+
+    // Check each zone
+    for (const zone of deliveryZones) {
+      if (zone.coordinates && isPointInPolygon(mapPosition, zone.coordinates)) {
+        setIsInDeliveryZone(true);
+        setSelectedZone(zone);
+        setZoneFee(zone.delivery_fee || 0);
+        setDeliveryFee(zone.delivery_fee || 0);
+        return;
+      }
+    }
+
+    // Not in any zone
+    setIsInDeliveryZone(false);
+    setSelectedZone(null);
+    setZoneFee(0);
+  }, [mapPosition, deliveryZones, isPickup, setDeliveryFee]);
+
+  // Reverse geocode using Nominatim
+  const reverseGeocode = useCallback(async (lat: number, lng: number) => {
+    setIsReverseGeocoding(true);
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+        {
+          headers: {
+            'Accept-Language': 'en',
+          }
+        }
+      );
+      
+      if (!response.ok) throw new Error('Geocoding failed');
+      
+      const data = await response.json();
+      const address = data.address || {};
+      
+      // Extract address components
+      const area = address.suburb || address.neighbourhood || address.city_district || address.town || address.city || '';
+      const street = address.road || address.street || '';
+      const building = address.house_number || '';
+      const block = address.quarter || '';
+      
+      setFormData(prev => ({
+        ...prev,
+        area: area,
+        street: street,
+        building: building || prev.building,
+        block: block || prev.block,
+      }));
+      
+      toast.success(isRTL ? 'تم تحديد العنوان' : 'Address detected from map');
+    } catch (err) {
+      console.error('Reverse geocoding error:', err);
+      toast.error(isRTL ? 'فشل في تحديد العنوان' : 'Failed to detect address');
+    } finally {
+      setIsReverseGeocoding(false);
+    }
+  }, [isRTL]);
+
+  // Handle map position change
+  const handleMapPositionChange = useCallback((pos: [number, number]) => {
+    setMapPosition(pos);
+    reverseGeocode(pos[0], pos[1]);
+  }, [reverseGeocode]);
+
+  // Get current location
+  const handleGetLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const pos: [number, number] = [position.coords.latitude, position.coords.longitude];
+        setMapPosition(pos);
+        reverseGeocode(pos[0], pos[1]);
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        toast.error('Unable to get your location');
+      }
+    );
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -69,6 +243,12 @@ const Checkout = () => {
       return;
     }
 
+    // Check delivery zone
+    if (!isPickup && isInDeliveryZone === false) {
+      toast.error(isRTL ? 'عذراً، موقعك خارج نطاق التوصيل' : 'Sorry, your location is outside our delivery area');
+      return;
+    }
+
     if (items.length === 0) {
       toast.error(isRTL ? 'سلتك فارغة' : 'Your cart is empty');
       navigate('/menu');
@@ -87,11 +267,13 @@ const Checkout = () => {
         floor: formData.floor,
         apartment: formData.apartment,
         additional_directions: formData.additionalInfo,
+        geo_lat: mapPosition?.[0],
+        geo_lng: mapPosition?.[1],
       };
 
-      // Calculate totals
-      const orderDeliveryFee = isPickup ? 0 : deliveryFee;
-      const orderTotal = isPickup ? (subtotal - discount) : total;
+      // Calculate totals with zone fee
+      const orderDeliveryFee = isPickup ? 0 : zoneFee;
+      const orderTotal = isPickup ? (subtotal - discount) : (subtotal - discount + orderDeliveryFee);
 
       // Build order items for API
       const orderItems = items.map(item => ({
@@ -167,6 +349,10 @@ const Checkout = () => {
       </div>
     );
   }
+
+  // Calculate final total with zone fee
+  const finalDeliveryFee = isPickup ? 0 : zoneFee;
+  const finalTotal = isPickup ? (subtotal - discount) : (subtotal - discount + finalDeliveryFee);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -293,7 +479,7 @@ const Checkout = () => {
                   </CardContent>
                 </Card>
 
-                {/* Delivery Address - Only for delivery orders */}
+                {/* Delivery Address with Map - Only for delivery orders */}
                 {!isPickup && (
                 <Card>
                   <CardHeader>
@@ -303,6 +489,98 @@ const Checkout = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    {/* Map Section */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>{isRTL ? 'حدد موقعك على الخريطة' : 'Pin your location on the map'}</Label>
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm"
+                          onClick={handleGetLocation}
+                        >
+                          <Navigation className="h-4 w-4 mr-2" />
+                          {isRTL ? 'موقعي الحالي' : 'Use my location'}
+                        </Button>
+                      </div>
+                      
+                      <div className="h-[250px] rounded-lg overflow-hidden border relative">
+                        <MapContainer
+                          center={mapPosition || KUWAIT_CENTER}
+                          zoom={13}
+                          style={{ height: '100%', width: '100%' }}
+                        >
+                          <TileLayer
+                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                          />
+                          {/* Show delivery zones */}
+                          {deliveryZones.map((zone, index) => (
+                            zone.coordinates && (
+                              <Polygon
+                                key={zone.id}
+                                positions={zone.coordinates.map(c => [c[0], c[1]] as [number, number])}
+                                pathOptions={{
+                                  color: selectedZone?.id === zone.id ? '#22c55e' : '#3b82f6',
+                                  fillColor: selectedZone?.id === zone.id ? '#22c55e' : '#3b82f6',
+                                  fillOpacity: 0.2,
+                                }}
+                              />
+                            )
+                          ))}
+                          <LocationMarker 
+                            position={mapPosition} 
+                            onPositionChange={handleMapPositionChange}
+                          />
+                        </MapContainer>
+                        
+                        {isReverseGeocoding && (
+                          <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
+                            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                          </div>
+                        )}
+                      </div>
+                      
+                      <p className="text-xs text-muted-foreground">
+                        {isRTL 
+                          ? 'انقر على الخريطة لتحديد موقعك وسيتم ملء العنوان تلقائياً'
+                          : 'Click on the map to pin your location and auto-fill address'
+                        }
+                      </p>
+
+                      {/* Zone Status */}
+                      {mapPosition && (
+                        <div className={`p-3 rounded-lg ${
+                          isInDeliveryZone === true 
+                            ? 'bg-green-50 border border-green-200' 
+                            : isInDeliveryZone === false 
+                              ? 'bg-red-50 border border-red-200'
+                              : 'bg-gray-50'
+                        }`}>
+                          {isInDeliveryZone === true && selectedZone ? (
+                            <div className="flex items-center gap-2 text-green-700">
+                              <MapPin className="h-4 w-4" />
+                              <span className="text-sm font-medium">
+                                {isRTL ? `منطقة التوصيل: ${selectedZone.zone_name}` : `Delivery Zone: ${selectedZone.zone_name}`}
+                                {' - '}
+                                {isRTL ? `رسوم التوصيل: ${selectedZone.delivery_fee?.toFixed(3)} د.ك` : `Fee: ${selectedZone.delivery_fee?.toFixed(3)} KWD`}
+                              </span>
+                            </div>
+                          ) : isInDeliveryZone === false ? (
+                            <div className="flex items-center gap-2 text-red-700">
+                              <AlertTriangle className="h-4 w-4" />
+                              <span className="text-sm font-medium">
+                                {isRTL ? 'عذراً، موقعك خارج نطاق التوصيل' : 'Sorry, your location is outside our delivery area'}
+                              </span>
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Address Fields */}
+                    <Separator />
+                    
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="area">{t.checkout.area} *</Label>
@@ -313,6 +591,7 @@ const Checkout = () => {
                           onChange={handleInputChange}
                           required 
                           className={isRTL ? 'text-right' : ''}
+                          placeholder={isRTL ? 'يتم ملؤه من الخريطة' : 'Auto-filled from map'}
                         />
                       </div>
                       <div className="space-y-2">
@@ -335,6 +614,7 @@ const Checkout = () => {
                         value={formData.street}
                         onChange={handleInputChange}
                         className={isRTL ? 'text-right' : ''}
+                        placeholder={isRTL ? 'يتم ملؤه من الخريطة' : 'Auto-filled from map'}
                       />
                     </div>
                     <div className="grid grid-cols-3 gap-4">
@@ -379,6 +659,7 @@ const Checkout = () => {
                         onChange={handleInputChange}
                         rows={2}
                         className={isRTL ? 'text-right' : ''}
+                        placeholder={isRTL ? 'تعليمات إضافية للتوصيل (اختياري)' : 'Additional delivery instructions (optional)'}
                       />
                     </div>
                   </CardContent>
@@ -399,66 +680,36 @@ const Checkout = () => {
                       onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}
                       className="space-y-3"
                     >
-                      {/* Cash */}
-                      <Label
-                        htmlFor="cash"
-                        className={`flex items-center gap-4 p-4 border rounded-xl cursor-pointer transition-all ${
-                          paymentMethod === 'cash'
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border hover:border-primary/50'
-                        } ${isRTL ? 'flex-row-reverse' : ''}`}
-                      >
+                      <div className={`flex items-center space-x-3 p-4 border rounded-lg cursor-pointer hover:bg-muted/50 ${paymentMethod === 'cash' ? 'border-primary bg-primary/5' : ''} ${isRTL ? 'flex-row-reverse space-x-reverse' : ''}`}>
                         <RadioGroupItem value="cash" id="cash" />
-                        <Banknote className={`h-6 w-6 ${paymentMethod === 'cash' ? 'text-primary' : 'text-muted-foreground'}`} />
-                        <div className={isRTL ? 'text-right' : ''}>
-                          <p className="font-medium">{t.checkout.cashOnDelivery}</p>
-                        </div>
-                      </Label>
-
-                      {/* Online Payment */}
-                      <Label
-                        htmlFor="online"
-                        className={`flex items-center gap-4 p-4 border rounded-xl cursor-pointer transition-all ${
-                          paymentMethod === 'online'
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border hover:border-primary/50'
-                        } ${isRTL ? 'flex-row-reverse' : ''}`}
-                      >
-                        <RadioGroupItem value="online" id="online" />
-                        <CreditCard className={`h-6 w-6 ${paymentMethod === 'online' ? 'text-primary' : 'text-muted-foreground'}`} />
-                        <div className={isRTL ? 'text-right' : ''}>
-                          <p className="font-medium">{t.checkout.onlinePayment}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {t.checkout.onlinePaymentDesc}
-                          </p>
-                        </div>
-                      </Label>
-                    </RadioGroup>
-
-                    {paymentMethod === 'online' && (
-                      <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                        <p className="text-sm text-yellow-800">
-                          {isRTL 
-                            ? '⚠️ الدفع الإلكتروني غير مفعل حالياً. يرجى اختيار الدفع النقدي.'
-                            : '⚠️ Online payment is not configured yet. Please select cash payment.'
-                          }
-                        </p>
+                        <Label htmlFor="cash" className={`flex items-center gap-2 cursor-pointer flex-1 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                          <Banknote className="h-5 w-5" />
+                          {t.checkout.cashOnDelivery}
+                        </Label>
                       </div>
-                    )}
+                      <div className={`flex items-center space-x-3 p-4 border rounded-lg cursor-pointer hover:bg-muted/50 ${paymentMethod === 'online' ? 'border-primary bg-primary/5' : ''} ${isRTL ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                        <RadioGroupItem value="online" id="online" disabled />
+                        <Label htmlFor="online" className={`flex items-center gap-2 cursor-pointer flex-1 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                          <CreditCard className="h-5 w-5" />
+                          {t.checkout.onlinePayment}
+                          <span className="text-xs text-muted-foreground ml-2">(Coming Soon)</span>
+                        </Label>
+                      </div>
+                    </RadioGroup>
                   </CardContent>
                 </Card>
 
                 {/* Order Notes */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>{t.checkout.notes}</CardTitle>
+                    <CardTitle>{isRTL ? 'ملاحظات الطلب' : 'Order Notes'}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <Textarea 
                       name="notes"
-                      placeholder={t.checkout.notesPlaceholder}
                       value={formData.notes}
                       onChange={handleInputChange}
+                      placeholder={isRTL ? 'أي ملاحظات خاصة بالطلب...' : 'Any special notes for your order...'}
                       rows={3}
                       className={isRTL ? 'text-right' : ''}
                     />
@@ -468,17 +719,17 @@ const Checkout = () => {
 
               {/* Order Summary */}
               <div className="lg:col-span-1">
-                <Card className="sticky top-28">
+                <Card className="sticky top-24">
                   <CardHeader>
                     <CardTitle>{t.checkout.orderSummary}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {/* Items */}
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {items.map((item) => (
-                        <div key={item.id} className={`flex justify-between text-sm ${isRTL ? 'flex-row-reverse' : ''}`}>
-                          <span className="flex-1">
-                            {isRTL ? item.name_ar : item.name} × {item.quantity}
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {items.map((item, index) => (
+                        <div key={index} className={`flex justify-between text-sm ${isRTL ? 'flex-row-reverse' : ''}`}>
+                          <span className={isRTL ? 'text-right' : ''}>
+                            {item.quantity}x {item.name}
                           </span>
                           <span className="font-medium">{formatPrice(item.total_price)}</span>
                         </div>
@@ -489,48 +740,49 @@ const Checkout = () => {
 
                     {/* Totals */}
                     <div className="space-y-2">
-                      <div className={`flex justify-between text-sm ${isRTL ? 'flex-row-reverse' : ''}`}>
-                        <span>{t.cart.subtotal}</span>
+                      <div className={`flex justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
+                        <span className="text-muted-foreground">{t.checkout.subtotal}</span>
                         <span>{formatPrice(subtotal)}</span>
                       </div>
                       {discount > 0 && (
-                        <div className={`flex justify-between text-sm text-green-600 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                          <span>{t.cart.discount}</span>
+                        <div className={`flex justify-between text-green-600 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                          <span>{t.checkout.discount}</span>
                           <span>-{formatPrice(discount)}</span>
                         </div>
                       )}
-                      <div className={`flex justify-between text-sm ${isRTL ? 'flex-row-reverse' : ''}`}>
-                        <span>{t.cart.deliveryFee}</span>
-                        <span>{deliveryFee > 0 ? formatPrice(deliveryFee) : t.cart.free}</span>
-                      </div>
+                      {!isPickup && (
+                        <div className={`flex justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
+                          <span className="text-muted-foreground">{t.checkout.deliveryFee}</span>
+                          <span>{finalDeliveryFee > 0 ? formatPrice(finalDeliveryFee) : (isRTL ? 'حدد الموقع' : 'Select location')}</span>
+                        </div>
+                      )}
                     </div>
 
                     <Separator />
 
-                    <div className={`flex justify-between font-semibold text-lg ${isRTL ? 'flex-row-reverse' : ''}`}>
-                      <span>{t.cart.total}</span>
-                      <span className="text-primary">{formatPrice(total)} {isRTL ? 'د.ك' : 'KWD'}</span>
+                    <div className={`flex justify-between text-lg font-bold ${isRTL ? 'flex-row-reverse' : ''}`}>
+                      <span>{t.checkout.total}</span>
+                      <span className="text-primary">{formatPrice(finalTotal)}</span>
                     </div>
 
                     <Button 
                       type="submit" 
-                      className="w-full" 
-                      size="lg" 
-                      disabled={isProcessing || paymentMethod === 'online'}
+                      className="w-full mt-4"
+                      disabled={isProcessing || (!isPickup && isInDeliveryZone === false)}
                     >
                       {isProcessing ? (
                         <>
-                          <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                          {t.checkout.processing}
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          {isRTL ? 'جاري المعالجة...' : 'Processing...'}
                         </>
                       ) : (
                         t.checkout.placeOrder
                       )}
                     </Button>
 
-                    {!isAuthenticated && (
-                      <p className="text-xs text-center text-muted-foreground">
-                        {t.auth.loginToEarnPoints}
+                    {!isPickup && isInDeliveryZone === false && (
+                      <p className="text-xs text-red-600 text-center">
+                        {isRTL ? 'لا يمكن تقديم الطلب - موقعك خارج نطاق التوصيل' : 'Cannot place order - location outside delivery area'}
                       </p>
                     )}
                   </CardContent>
