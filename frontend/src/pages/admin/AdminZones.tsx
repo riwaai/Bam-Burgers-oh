@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Plus, Edit, Trash2 } from 'lucide-react';
+import { MapPin, Plus, Edit, Trash2, Info } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,18 +7,21 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { supabase, TENANT_ID } from '@/integrations/supabase/client';
+import { Textarea } from '@/components/ui/textarea';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface DeliveryZone {
   id: string;
-  name: string;
-  name_ar?: string;
-  polygon?: any;
+  branch_id?: string;
+  zone_name: string;
+  zone_type: string;
+  coordinates: number[][];
   delivery_fee: number;
   min_order_amount: number;
-  estimated_time?: string;
+  estimated_time_minutes?: number;
   status: string;
+  created_at: string;
 }
 
 const AdminZones = () => {
@@ -28,12 +31,12 @@ const AdminZones = () => {
   const [editingZone, setEditingZone] = useState<DeliveryZone | null>(null);
   
   const [form, setForm] = useState({
-    name: '',
-    name_ar: '',
-    delivery_fee: 0,
-    min_order_amount: 0,
-    estimated_time: '30-45 min',
+    zone_name: '',
+    delivery_fee: 0.5,
+    min_order_amount: 3,
+    estimated_time_minutes: 30,
     status: 'active',
+    coordinates: '' as string,
   });
 
   useEffect(() => {
@@ -45,14 +48,12 @@ const AdminZones = () => {
       const { data, error } = await supabase
         .from('delivery_zones')
         .select('*')
-        .eq('tenant_id', TENANT_ID)
-        .order('name', { ascending: true });
+        .order('zone_name', { ascending: true });
 
       if (error) throw error;
       setZones(data || []);
     } catch (err) {
       console.error('Error fetching zones:', err);
-      // Don't show error toast if table doesn't exist
     } finally {
       setLoading(false);
     }
@@ -60,24 +61,45 @@ const AdminZones = () => {
 
   const handleSave = async () => {
     try {
-      if (!form.name) {
+      if (!form.zone_name) {
         toast.error('Please enter a zone name');
         return;
       }
 
+      // Parse coordinates
+      let coordinates: number[][] = [];
+      try {
+        if (form.coordinates) {
+          coordinates = JSON.parse(form.coordinates);
+        } else {
+          // Default to Salwa area polygon
+          coordinates = [
+            [29.2759, 47.8774],
+            [29.2759, 48.0774],
+            [29.4759, 48.0774],
+            [29.4759, 47.8774],
+            [29.2759, 47.8774]
+          ];
+        }
+      } catch (e) {
+        toast.error('Invalid coordinates format. Use JSON array format.');
+        return;
+      }
+
       const zoneData = {
-        name: form.name,
-        name_ar: form.name_ar || null,
+        zone_name: form.zone_name,
+        zone_type: 'polygon',
+        coordinates: coordinates,
         delivery_fee: form.delivery_fee,
         min_order_amount: form.min_order_amount,
-        estimated_time: form.estimated_time || null,
+        estimated_time_minutes: form.estimated_time_minutes || 30,
         status: form.status,
       };
 
       if (editingZone) {
         const { error } = await supabase
           .from('delivery_zones')
-          .update({ ...zoneData, updated_at: new Date().toISOString() })
+          .update(zoneData)
           .eq('id', editingZone.id);
 
         if (error) throw error;
@@ -85,10 +107,7 @@ const AdminZones = () => {
       } else {
         const { error } = await supabase
           .from('delivery_zones')
-          .insert({
-            tenant_id: TENANT_ID,
-            ...zoneData,
-          });
+          .insert(zoneData);
 
         if (error) throw error;
         toast.success('Zone created');
@@ -123,12 +142,12 @@ const AdminZones = () => {
 
   const resetForm = () => {
     setForm({
-      name: '',
-      name_ar: '',
-      delivery_fee: 0,
-      min_order_amount: 0,
-      estimated_time: '30-45 min',
+      zone_name: '',
+      delivery_fee: 0.5,
+      min_order_amount: 3,
+      estimated_time_minutes: 30,
       status: 'active',
+      coordinates: '',
     });
     setEditingZone(null);
   };
@@ -136,17 +155,17 @@ const AdminZones = () => {
   const openEdit = (zone: DeliveryZone) => {
     setEditingZone(zone);
     setForm({
-      name: zone.name,
-      name_ar: zone.name_ar || '',
-      delivery_fee: zone.delivery_fee || 0,
-      min_order_amount: zone.min_order_amount || 0,
-      estimated_time: zone.estimated_time || '30-45 min',
+      zone_name: zone.zone_name,
+      delivery_fee: zone.delivery_fee || 0.5,
+      min_order_amount: zone.min_order_amount || 3,
+      estimated_time_minutes: zone.estimated_time_minutes || 30,
       status: zone.status,
+      coordinates: JSON.stringify(zone.coordinates),
     });
     setShowDialog(true);
   };
 
-  // Generate random color for zone
+  // Generate color for zone
   const getZoneColor = (index: number) => {
     const colors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
     return colors[index % colors.length];
@@ -177,11 +196,12 @@ const AdminZones = () => {
       <Card className="bg-blue-50 border-blue-200">
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
-            <MapPin className="h-5 w-5 text-blue-600 mt-0.5" />
+            <Info className="h-5 w-5 text-blue-600 mt-0.5" />
             <div>
-              <p className="font-medium text-blue-900">Delivery Zone Management</p>
+              <p className="font-medium text-blue-900">Delivery Zone Configuration</p>
               <p className="text-sm text-blue-800 mt-1">
-                Configure delivery zones for your restaurant. Set delivery fees and minimum order amounts for each area.
+                Configure delivery zones for your restaurant. Each zone has its own delivery fee and minimum order amount.
+                Customers can only place orders if their location is within an active delivery zone.
               </p>
             </div>
           </div>
@@ -200,8 +220,8 @@ const AdminZones = () => {
                     style={{ backgroundColor: getZoneColor(index) }}
                   />
                   <div>
-                    <h3 className="font-semibold">{zone.name}</h3>
-                    {zone.name_ar && <p className="text-sm text-muted-foreground">{zone.name_ar}</p>}
+                    <h3 className="font-semibold">{zone.zone_name}</h3>
+                    <p className="text-xs text-muted-foreground">{zone.zone_type}</p>
                   </div>
                 </div>
                 <Badge variant={zone.status === 'active' ? 'default' : 'secondary'}>
@@ -217,12 +237,16 @@ const AdminZones = () => {
                   <span className="text-muted-foreground">Min Order:</span>
                   <span className="font-medium">{(zone.min_order_amount || 0).toFixed(3)} KWD</span>
                 </div>
-                {zone.estimated_time && (
+                {zone.estimated_time_minutes && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Est. Time:</span>
-                    <span className="font-medium">{zone.estimated_time}</span>
+                    <span className="font-medium">{zone.estimated_time_minutes} min</span>
                   </div>
                 )}
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Coordinates:</span>
+                  <span className="font-medium">{zone.coordinates?.length || 0} points</span>
+                </div>
               </div>
               <div className="flex gap-2 mt-4 pt-3 border-t">
                 <Button variant="outline" size="sm" className="flex-1" onClick={() => openEdit(zone)}>
@@ -247,29 +271,18 @@ const AdminZones = () => {
 
       {/* Zone Dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingZone ? 'Edit Zone' : 'Add Zone'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Zone Name (English)</Label>
-                <Input
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="e.g. Salmiya"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Zone Name (Arabic)</Label>
-                <Input
-                  value={form.name_ar}
-                  onChange={(e) => setForm({ ...form, name_ar: e.target.value })}
-                  placeholder="السالمية"
-                  dir="rtl"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>Zone Name</Label>
+              <Input
+                value={form.zone_name}
+                onChange={(e) => setForm({ ...form, zone_name: e.target.value })}
+                placeholder="e.g. Salmiya, Hawally"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -295,11 +308,11 @@ const AdminZones = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Estimated Time</Label>
+                <Label>Est. Time (minutes)</Label>
                 <Input
-                  value={form.estimated_time}
-                  onChange={(e) => setForm({ ...form, estimated_time: e.target.value })}
-                  placeholder="e.g. 30-45 min"
+                  type="number"
+                  value={form.estimated_time_minutes}
+                  onChange={(e) => setForm({ ...form, estimated_time_minutes: parseInt(e.target.value) || 30 })}
                 />
               </div>
               <div className="space-y-2">
@@ -317,6 +330,20 @@ const AdminZones = () => {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Zone Coordinates (JSON)</Label>
+              <Textarea
+                value={form.coordinates}
+                onChange={(e) => setForm({ ...form, coordinates: e.target.value })}
+                placeholder='[[29.2759, 47.8774], [29.2759, 48.0774], [29.4759, 48.0774], [29.4759, 47.8774], [29.2759, 47.8774]]'
+                rows={4}
+                className="font-mono text-xs"
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter polygon coordinates as JSON array. Leave empty to use default Salwa area.
+              </p>
             </div>
           </div>
           <DialogFooter>
