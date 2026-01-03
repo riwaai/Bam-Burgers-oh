@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Loader2, Gift } from 'lucide-react';
+import { Gift, Save, Info } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,54 +8,54 @@ import { Switch } from '@/components/ui/switch';
 import { supabase, TENANT_ID } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-interface LoyaltyRule {
-  id: string;
+interface LoyaltySettings {
+  id?: string;
   points_per_kwd: number;
-  redemption_rate: number; // KWD per point
+  kwd_per_point: number;
   min_points_redeem: number;
-  max_points_redeem: number | null;
+  signup_bonus: number;
+  referral_bonus: number;
+  birthday_bonus: number;
   is_active: boolean;
 }
 
+const defaultSettings: LoyaltySettings = {
+  points_per_kwd: 10,
+  kwd_per_point: 0.01,
+  min_points_redeem: 100,
+  signup_bonus: 50,
+  referral_bonus: 100,
+  birthday_bonus: 200,
+  is_active: true,
+};
+
 const AdminLoyalty = () => {
-  const [rule, setRule] = useState<LoyaltyRule | null>(null);
+  const [settings, setSettings] = useState<LoyaltySettings>(defaultSettings);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const [form, setForm] = useState({
-    points_per_kwd: 1,
-    redemption_rate: 0.01,
-    min_points_redeem: 100,
-    max_points_redeem: '',
-    is_active: true,
-  });
-
   useEffect(() => {
-    fetchRule();
+    fetchSettings();
   }, []);
 
-  const fetchRule = async () => {
+  const fetchSettings = async () => {
     try {
       const { data, error } = await supabase
-        .from('loyalty_rules')
+        .from('loyalty_settings')
         .select('*')
         .eq('tenant_id', TENANT_ID)
         .single();
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
 
       if (data) {
-        setRule(data);
-        setForm({
-          points_per_kwd: data.points_per_kwd,
-          redemption_rate: data.redemption_rate,
-          min_points_redeem: data.min_points_redeem,
-          max_points_redeem: data.max_points_redeem?.toString() || '',
-          is_active: data.is_active,
-        });
+        setSettings(data);
       }
     } catch (err) {
-      console.error('Error fetching loyalty rules:', err);
+      console.error('Error fetching loyalty settings:', err);
+      // Use default settings if table doesn't exist
     } finally {
       setLoading(false);
     }
@@ -64,33 +64,40 @@ const AdminLoyalty = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const ruleData = {
-        points_per_kwd: form.points_per_kwd,
-        redemption_rate: form.redemption_rate,
-        min_points_redeem: form.min_points_redeem,
-        max_points_redeem: form.max_points_redeem ? parseInt(form.max_points_redeem) : null,
-        is_active: form.is_active,
-      };
-
-      if (rule) {
+      if (settings.id) {
+        // Update existing
         const { error } = await supabase
-          .from('loyalty_rules')
-          .update({ ...ruleData, updated_at: new Date().toISOString() })
-          .eq('id', rule.id);
+          .from('loyalty_settings')
+          .update({
+            points_per_kwd: settings.points_per_kwd,
+            kwd_per_point: settings.kwd_per_point,
+            min_points_redeem: settings.min_points_redeem,
+            signup_bonus: settings.signup_bonus,
+            referral_bonus: settings.referral_bonus,
+            birthday_bonus: settings.birthday_bonus,
+            is_active: settings.is_active,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', settings.id);
+
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('loyalty_rules').insert({
-          ...ruleData,
-          tenant_id: TENANT_ID,
-        });
+        // Create new
+        const { error } = await supabase
+          .from('loyalty_settings')
+          .insert({
+            tenant_id: TENANT_ID,
+            ...settings,
+          });
+
         if (error) throw error;
       }
 
-      toast.success('Loyalty rules saved');
-      fetchRule();
-    } catch (err: any) {
-      console.error('Error saving loyalty rules:', err);
-      toast.error(err.message || 'Failed to save');
+      toast.success('Loyalty settings saved');
+      fetchSettings();
+    } catch (err) {
+      console.error('Error saving loyalty settings:', err);
+      toast.error('Failed to save settings. The loyalty_settings table might not exist.');
     } finally {
       setSaving(false);
     }
@@ -99,129 +106,148 @@ const AdminLoyalty = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Loyalty Program</h1>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Loyalty Program</h1>
+          <p className="text-muted-foreground">Configure your customer loyalty program</p>
+        </div>
+        <Button onClick={handleSave} disabled={saving}>
+          <Save className="h-4 w-4 mr-2" />
+          {saving ? 'Saving...' : 'Save Settings'}
+        </Button>
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Gift className="h-5 w-5" />
-              Points Settings
-            </CardTitle>
-            <CardDescription>
-              Configure how customers earn and redeem loyalty points
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-              <div>
-                <p className="font-medium">Program Status</p>
-                <p className="text-sm text-muted-foreground">Enable or disable loyalty program</p>
-              </div>
-              <Switch
-                checked={form.is_active}
-                onCheckedChange={(checked) => setForm({ ...form, is_active: checked })}
-              />
-            </div>
-
+      {/* Program Status */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Gift className="h-5 w-5" />
+            Program Status
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
             <div>
+              <p className="font-medium">Enable Loyalty Program</p>
+              <p className="text-sm text-muted-foreground">Allow customers to earn and redeem points</p>
+            </div>
+            <Switch
+              checked={settings.is_active}
+              onCheckedChange={(checked) => setSettings({ ...settings, is_active: checked })}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Points Configuration */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Points Configuration</CardTitle>
+          <CardDescription>Set how customers earn and redeem points</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
               <Label>Points per 1 KWD spent</Label>
               <Input
                 type="number"
-                value={form.points_per_kwd}
-                onChange={(e) => setForm({ ...form, points_per_kwd: parseInt(e.target.value) })}
+                value={settings.points_per_kwd}
+                onChange={(e) => setSettings({ ...settings, points_per_kwd: parseInt(e.target.value) || 0 })}
               />
-              <p className="text-xs text-muted-foreground mt-1">
-                Customer earns {form.points_per_kwd} point(s) for every 1 KWD spent
+              <p className="text-xs text-muted-foreground">
+                Customer earns {settings.points_per_kwd} points for every 1 KWD spent
               </p>
             </div>
-
-            <div>
-              <Label>Redemption Rate (KWD per point)</Label>
+            <div className="space-y-2">
+              <Label>KWD value per point</Label>
               <Input
                 type="number"
                 step="0.001"
-                value={form.redemption_rate}
-                onChange={(e) => setForm({ ...form, redemption_rate: parseFloat(e.target.value) })}
+                value={settings.kwd_per_point}
+                onChange={(e) => setSettings({ ...settings, kwd_per_point: parseFloat(e.target.value) || 0 })}
               />
-              <p className="text-xs text-muted-foreground mt-1">
-                Each point is worth {form.redemption_rate} KWD when redeemed
+              <p className="text-xs text-muted-foreground">
+                {Math.round(1 / settings.kwd_per_point)} points = 1 KWD discount
               </p>
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Minimum points to redeem</Label>
+            <Input
+              type="number"
+              value={settings.min_points_redeem}
+              onChange={(e) => setSettings({ ...settings, min_points_redeem: parseInt(e.target.value) || 0 })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Customers need at least {settings.min_points_redeem} points to redeem
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
-            <div>
-              <Label>Minimum Points to Redeem</Label>
+      {/* Bonus Points */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Bonus Points</CardTitle>
+          <CardDescription>Configure bonus points for special actions</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Sign-up Bonus</Label>
               <Input
                 type="number"
-                value={form.min_points_redeem}
-                onChange={(e) => setForm({ ...form, min_points_redeem: parseInt(e.target.value) })}
+                value={settings.signup_bonus}
+                onChange={(e) => setSettings({ ...settings, signup_bonus: parseInt(e.target.value) || 0 })}
               />
+              <p className="text-xs text-muted-foreground">Points for new customers</p>
             </div>
-
-            <div>
-              <Label>Maximum Points per Order</Label>
+            <div className="space-y-2">
+              <Label>Referral Bonus</Label>
               <Input
                 type="number"
-                value={form.max_points_redeem}
-                onChange={(e) => setForm({ ...form, max_points_redeem: e.target.value })}
-                placeholder="No limit"
+                value={settings.referral_bonus}
+                onChange={(e) => setSettings({ ...settings, referral_bonus: parseInt(e.target.value) || 0 })}
               />
+              <p className="text-xs text-muted-foreground">Points for successful referrals</p>
             </div>
-
-            <Button onClick={handleSave} disabled={saving} className="w-full">
-              {saving ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4 mr-2" />
-              )}
-              Save Settings
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Preview</CardTitle>
-            <CardDescription>How customers will see the loyalty program</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="bg-gradient-to-r from-primary to-primary/80 text-white p-6 rounded-lg">
-              <h3 className="text-xl font-bold mb-4">Bam Rewards</h3>
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">🎁</span>
-                  <span>Earn {form.points_per_kwd} point for every 1 KWD</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">💰</span>
-                  <span>Redeem {form.min_points_redeem} points = {(form.min_points_redeem * form.redemption_rate).toFixed(3)} KWD</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">⭐</span>
-                  <span>Min {form.min_points_redeem} points to redeem</span>
-                </div>
-              </div>
+            <div className="space-y-2">
+              <Label>Birthday Bonus</Label>
+              <Input
+                type="number"
+                value={settings.birthday_bonus}
+                onChange={(e) => setSettings({ ...settings, birthday_bonus: parseInt(e.target.value) || 0 })}
+              />
+              <p className="text-xs text-muted-foreground">Points on customer's birthday</p>
             </div>
+          </div>
+        </CardContent>
+      </Card>
 
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-              <h4 className="font-medium mb-2">Example:</h4>
-              <p className="text-sm text-muted-foreground">
-                A customer spends <strong>10 KWD</strong> → Earns <strong>{10 * form.points_per_kwd} points</strong>
-              </p>
-              <p className="text-sm text-muted-foreground">
-                With <strong>{form.min_points_redeem} points</strong> → Gets <strong>{(form.min_points_redeem * form.redemption_rate).toFixed(3)} KWD</strong> discount
-              </p>
+      {/* Info Card */}
+      <Card className="bg-blue-50 border-blue-200">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <Info className="h-5 w-5 text-blue-600 mt-0.5" />
+            <div>
+              <p className="font-medium text-blue-900">How the loyalty program works</p>
+              <ul className="text-sm text-blue-800 mt-2 space-y-1">
+                <li>• Customers earn {settings.points_per_kwd} points for every 1 KWD spent</li>
+                <li>• {Math.round(1 / settings.kwd_per_point)} points can be redeemed for 1 KWD discount</li>
+                <li>• Minimum {settings.min_points_redeem} points required to redeem</li>
+                <li>• New customers get {settings.signup_bonus} bonus points</li>
+              </ul>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
