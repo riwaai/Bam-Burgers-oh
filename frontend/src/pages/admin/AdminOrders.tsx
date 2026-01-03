@@ -128,14 +128,14 @@ const AdminOrders = () => {
 
   const fetchOrders = async () => {
     try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('tenant_id', TENANT_ID)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
+      // Fetch from backend API which applies local status updates
+      const response = await fetch(`${BACKEND_URL}/api/admin/orders?limit=100`);
+      if (!response.ok) throw new Error('Failed to fetch');
+      const ordersData = await response.json();
+      
+      // Fetch items for each order
       const ordersWithItems = await Promise.all(
-        (data || []).map(async (order) => {
+        (ordersData || []).map(async (order: any) => {
           const { data: items } = await supabase.from('order_items').select('*').eq('order_id', order.id);
           return { ...order, items: items || [] };
         })
@@ -143,6 +143,24 @@ const AdminOrders = () => {
       setOrders(ordersWithItems);
     } catch (err) {
       console.error('Error fetching orders:', err);
+      // Fallback to direct Supabase fetch
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('tenant_id', TENANT_ID)
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        const ordersWithItems = await Promise.all(
+          (data || []).map(async (order) => {
+            const { data: items } = await supabase.from('order_items').select('*').eq('order_id', order.id);
+            return { ...order, items: items || [] };
+          })
+        );
+        setOrders(ordersWithItems);
+      } catch (e) {
+        console.error('Fallback fetch failed:', e);
+      }
     } finally {
       setLoading(false);
     }
