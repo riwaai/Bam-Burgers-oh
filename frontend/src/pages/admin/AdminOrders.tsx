@@ -194,27 +194,19 @@ const AdminOrders = () => {
   const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     setUpdatingStatus(orderId);
     try {
-      const updateData: any = { 
-        status: newStatus, 
-        updated_at: new Date().toISOString() 
-      };
+      // Use backend API to update status (bypasses Supabase trigger)
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || '';
+      const response = await fetch(`${backendUrl}/api/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
 
-      if (newStatus === 'accepted') {
-        updateData.accepted_at = new Date().toISOString();
-      } else if (newStatus === 'delivered' || newStatus === 'completed') {
-        updateData.completed_at = new Date().toISOString();
-      } else if (newStatus === 'cancelled') {
-        updateData.cancelled_at = new Date().toISOString();
-      }
-
-      const { error } = await supabase
-        .from('orders')
-        .update(updateData)
-        .eq('id', orderId);
-
-      if (error) {
-        console.error('Supabase update error:', error);
-        throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to update status');
       }
 
       toast.success(`Order status updated to ${statusConfig[newStatus].label}`);
@@ -231,9 +223,9 @@ const AdminOrders = () => {
 
       // Refresh from server
       fetchOrders();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error updating order:', err);
-      toast.error('Failed to update order status');
+      toast.error(err.message || 'Failed to update order status');
     } finally {
       setUpdatingStatus(null);
     }
