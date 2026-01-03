@@ -1,8 +1,5 @@
 import React from 'react';
-
-const LOGO_URL = 'https://customer-assets.emergentagent.com/job_bamburger/artifacts/n9z16qz8_Logo.png';
-const RESTAURANT_ADDRESS = 'Kitchen Park Salwa - 834C+HH Rumaithiya, Kuwait';
-const RESTAURANT_PHONE = '+965 9474 5424';
+import { LOGO_URL, RESTAURANT_ADDRESS, RESTAURANT_PHONE, RESTAURANT_NAME } from '@/integrations/supabase/client';
 
 interface OrderReceiptProps {
   order: {
@@ -41,117 +38,126 @@ const OrderReceipt: React.FC<OrderReceiptProps> = ({ order }) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-GB', {
       day: '2-digit',
-      month: '2-digit',
+      month: 'long',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
+      hour12: true,
     });
   };
 
-  // Calculate loyalty points (1 point per 1 KWD spent)
-  const loyaltyPoints = Math.floor(order.total_amount);
+  // Calculate total items count
+  const totalItems = order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
 
   return (
-    <div className="bg-white p-4 text-black text-sm font-mono" style={{ width: '300px' }}>
-      {/* Header with Logo */}
-      <div className="text-center border-b border-dashed border-gray-400 pb-4 mb-4">
-        <img src={LOGO_URL} alt="Bam Burgers" className="h-16 mx-auto mb-2" />
-        <p className="text-xs">{RESTAURANT_ADDRESS}</p>
-        <p className="text-xs">{RESTAURANT_PHONE}</p>
+    <div className="bg-white p-6 text-black text-sm" style={{ width: '320px', fontFamily: 'monospace' }}>
+      {/* Header with Logo - Matching the sample */}
+      <div className="text-center border-b-2 border-black pb-4 mb-4">
+        <img src={LOGO_URL} alt="Bam" className="h-16 mx-auto mb-2" />
+        <p className="font-bold text-lg">{RESTAURANT_NAME}</p>
+        <p className="text-xs">Salwa</p>
+        <p className="text-xs">{formatDate(order.created_at)}</p>
       </div>
 
-      {/* Order Info */}
-      <div className="border-b border-dashed border-gray-400 pb-4 mb-4">
-        <div className="flex justify-between">
-          <span>Order #:</span>
-          <span className="font-bold">{order.order_number}</span>
+      {/* Bill Info - Matching the sample "Quick Bill" format */}
+      <div className="text-center border-b border-dashed border-gray-400 pb-3 mb-3">
+        <p className="font-bold">Quick Bill</p>
+        <p className="font-bold text-xl">Bill No:{order.order_number.split('-').pop()}</p>
+        <p className="text-sm">Quick Bill: {order.order_number.split('-').pop()}</p>
+      </div>
+
+      {/* User and Payment Info */}
+      <div className="flex justify-between border-b border-dashed border-gray-400 pb-3 mb-3 text-xs">
+        <div>
+          <p className="font-bold">Quick Bill</p>
+          <p>Pay Mode: Cash</p>
         </div>
-        <div className="flex justify-between">
-          <span>Date:</span>
-          <span>{formatDate(order.created_at)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Type:</span>
-          <span>{order.order_type === 'pickup' ? 'Pickup' : 'Delivery'}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Status:</span>
-          <span className="uppercase">{order.status?.replace(/_/g, ' ')}</span>
+        <div className="text-right">
+          <p>User: {order.customer_name || 'bamburger1'}</p>
         </div>
       </div>
 
-      {/* Customer Info */}
-      <div className="border-b border-dashed border-gray-400 pb-4 mb-4">
-        <p className="font-bold mb-1">Customer:</p>
-        <p>{order.customer_name}</p>
-        <p>{order.customer_phone}</p>
-        {order.order_type === 'delivery' && order.delivery_address && (
-          <p className="text-xs mt-1">{formatAddress(order.delivery_address)}</p>
-        )}
+      {/* Items Table Header */}
+      <div className="border-b border-gray-300 pb-2 mb-2">
+        <div className="grid grid-cols-12 text-xs font-bold">
+          <div className="col-span-5">Item / غرض</div>
+          <div className="col-span-2 text-center">Qty / الكمية</div>
+          <div className="col-span-2 text-right">Rate / السعر</div>
+          <div className="col-span-3 text-right">Total / الإجمالي</div>
+        </div>
       </div>
 
       {/* Order Items */}
-      <div className="border-b border-dashed border-gray-400 pb-4 mb-4">
-        <p className="font-bold mb-2">Items:</p>
+      <div className="border-b border-dashed border-gray-400 pb-3 mb-3">
         {order.items?.map((item, idx) => (
-          <div key={idx} className="mb-2">
-            <div className="flex justify-between">
-              <span>
-                {item.quantity}x {item.item_name_en}
-              </span>
-              <span>{item.total_price?.toFixed(3)}</span>
+          <div key={idx} className="mb-3">
+            <div className="grid grid-cols-12 text-xs">
+              <div className="col-span-5">
+                <p className="font-medium">{item.item_name_en}</p>
+                {item.item_name_ar && (
+                  <p className="text-gray-600 text-right" dir="rtl">{item.item_name_ar}</p>
+                )}
+              </div>
+              <div className="col-span-2 text-center">{item.quantity}</div>
+              <div className="col-span-2 text-right">{item.unit_price?.toFixed(3)}</div>
+              <div className="col-span-3 text-right">{item.total_price?.toFixed(3)}</div>
             </div>
-            {item.item_name_ar && (
-              <p className="text-xs text-gray-600 text-right">{item.item_name_ar}</p>
-            )}
             {item.notes && (
-              <p className="text-xs text-orange-600">* {item.notes}</p>
+              <p className="text-xs text-orange-600 mt-1">* {item.notes}</p>
             )}
           </div>
         ))}
       </div>
 
-      {/* Totals */}
-      <div className="border-b border-dashed border-gray-400 pb-4 mb-4">
-        <div className="flex justify-between">
-          <span>Subtotal:</span>
-          <span>{order.subtotal?.toFixed(3)} KWD</span>
+      {/* Totals Section */}
+      <div className="border-b border-dashed border-gray-400 pb-3 mb-3">
+        <div className="flex justify-between text-sm font-bold">
+          <span>Total:</span>
+          <span>{totalItems}</span>
+          <span>د.ك {order.subtotal?.toFixed(3)}</span>
         </div>
-        {order.discount_amount > 0 && (
-          <div className="flex justify-between text-green-600">
-            <span>Discount:</span>
-            <span>-{order.discount_amount?.toFixed(3)} KWD</span>
-          </div>
-        )}
-        <div className="flex justify-between">
-          <span>Delivery Fee:</span>
+      </div>
+
+      {/* Grand Total - Matching the sample */}
+      <div className="text-center py-4 bg-gray-100 -mx-6 px-6 mb-4">
+        <p className="font-bold text-lg">Grand Total</p>
+        <p className="text-right font-bold" dir="rtl">المجموع الإجمالي</p>
+        <p className="font-bold text-2xl mt-2">د.ك {order.total_amount?.toFixed(3)}</p>
+      </div>
+
+      {/* Discount if any */}
+      {order.discount_amount > 0 && (
+        <div className="flex justify-between text-sm text-green-600 mb-2">
+          <span>Discount / الخصم:</span>
+          <span>-{order.discount_amount?.toFixed(3)} KWD</span>
+        </div>
+      )}
+
+      {/* Delivery Fee if any */}
+      {order.delivery_fee > 0 && (
+        <div className="flex justify-between text-sm mb-2">
+          <span>Delivery Fee / رسوم التوصيل:</span>
           <span>{order.delivery_fee?.toFixed(3)} KWD</span>
         </div>
-        <div className="flex justify-between font-bold text-lg mt-2 pt-2 border-t border-gray-400">
-          <span>TOTAL:</span>
-          <span>{order.total_amount?.toFixed(3)} KWD</span>
+      )}
+
+      {/* Customer Info if delivery */}
+      {order.order_type === 'delivery' && order.delivery_address && (
+        <div className="border-t border-dashed border-gray-400 pt-3 mt-3 text-xs">
+          <p className="font-bold mb-1">Delivery To / التوصيل إلى:</p>
+          <p>{order.customer_name}</p>
+          <p>{order.customer_phone}</p>
+          <p>{formatAddress(order.delivery_address)}</p>
         </div>
-      </div>
+      )}
 
-      {/* Loyalty Points */}
-      <div className="border-b border-dashed border-gray-400 pb-4 mb-4 text-center">
-        <p className="text-xs">Loyalty Points Earned</p>
-        <p className="font-bold text-lg">+{loyaltyPoints} points</p>
-      </div>
-
-      {/* Payment Status */}
-      <div className="text-center mb-4">
-        <p className="text-xs">Payment Status:</p>
-        <p className="font-bold uppercase">Cash on Delivery</p>
-      </div>
-
-      {/* Footer */}
-      <div className="text-center text-xs">
+      {/* Footer - Matching the sample */}
+      <div className="text-center text-xs mt-4 pt-4 border-t border-gray-300">
         <p className="mb-2">--------------------------------</p>
         <p className="font-bold">Thank you for choosing</p>
-        <p className="font-bold">Bam Burgers!</p>
-        <p className="mt-2">شكراً لاختياركم بام برجر</p>
-        <p className="mt-4">www.bamburgers.com</p>
+        <p className="font-bold">{RESTAURANT_NAME}!</p>
+        <p className="mt-2" dir="rtl">شكراً لاختياركم بام برجر</p>
+        <p className="mt-4 text-gray-500">Powered by TMBill v7.4.100</p>
       </div>
     </div>
   );
