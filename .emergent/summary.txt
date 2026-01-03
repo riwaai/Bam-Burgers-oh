@@ -1,162 +1,201 @@
 <analysis>**original_problem_statement:**
-The user wants to build a production-ready, customer-facing website for a fast-food restaurant, Bam Burgers.
+The user wants to build a production-ready, customer-facing website for a fast-food restaurant, Bam Burgers. The initial phase involved building the frontend and connecting it to Supabase for reading menu data.
 
-**PRODUCT REQUIREMENTS:**
-- **Branding:** Use specific colors (#c31c1c, #faf2f1, #c47071, #d98c94). The design should be premium, modern, clean, and mobile-first.
-- **Core Features:**
-    - Homepage with a hero section.
-    - Branch selector & Order type selector (Pickup/Delivery).
-    - Menu browsing by categories.
-    - Item detail modal with variant selection, modifiers, and special instructions.
-    - Shopping cart functionality.
-    - Customer authentication (Firebase) and guest checkout.
-    - Order confirmation and real-time order tracking page.
-    - Language toggle: English/Arabic with RTL support.
-- **Technical Stack:** Next.js 14, Tailwind CSS, shadcn/ui, Supabase PostgreSQL, JavaScript/React.
-- **Functionality:**
-    - All data (menu, orders, etc.) must be fetched from and sent to Supabase in real-time. No mock data.
-    - Order statuses (, , , , ) should be updated in real-time, controlled from an admin panel/POS.
-    - The website must be deployable on Hostinger.
-- **Recent Changes Requested:**
-    - Re-add the Pickup option with the address: Kitchen Park Salwa- 834C+HH Rumaithiya, kuwait.
-    - Change the hero banner text to OG BURGER MEAL.
+The project has now moved into a second major phase, which involves:
+1.  Fixing a critical order placement error.
+2.  Building a comprehensive admin panel at the  route.
+
+**PRODUCT REQUIREMENTS (Admin Panel & New Features):**
+-   **Admin Panel ():**
+    -   Secure login (Username: , Password: ).
+    -   **Menu Management:** Full CRUD for categories, items, modifiers.
+    -   **Promotions Management:** Full CRUD for coupons and loyalty program rules.
+    -   **Delivery Management:** A map-based editor (using OpenStreetMap) to draw delivery zones and set associated fees/minimum order amounts.
+    -   **Real-time Order Inbox:** A live view of incoming orders with a continuous buzzer sound until an order is accepted. It must show full order details (customer, items, notes, address, price) and allow status updates ( ->  ->  ->  -> ).
+    -   **Print Receipt:** An option to print a formatted order receipt from the admin panel.
+-   **Checkout Page Enhancements:**
+    -   Integrate an OpenStreetMap/Leaflet map to allow customers to pin their location, which auto-fills the address fields.
+    -   Validate the customer's address against the admin-defined delivery zones and apply the correct delivery fee.
+-   **Order Tracking Page Enhancements:**
+    -   Display the real-time animated order status as updated by the admin panel.
+    -   Provide a Download Receipt button for the customer.
+-   **Receipt Format:** Both admin and customer receipts must match a user-provided sample image, including the Bam Burgers logo, order details, and pricing.
+-   **Technical Backend:** All features must be wired to the existing Supabase backend, using its Realtime and REST APIs. No mock data.
 
 **User's preferred language**: English
 
 **what currently exists?**
-A visually complete and responsive frontend application built with Next.js (Vite) and TailwindCSS. The UI for the entire user flow (homepage, menu, item details, cart, checkout, login, order tracking) is in place, including Arabic RTL support and the company logo. However, the application is currently using **static mock data** for menu items and does not have a real connection to the Supabase backend for creating orders or fetching data. The project structure was copied from a reference GitHub repository.
+-   A responsive customer-facing frontend built with Next.js (Vite) and TailwindCSS.
+-   The frontend successfully reads and displays real menu data (categories, items, modifiers) from the Supabase database.
+-   A FastAPI backend server () has been created as a workaround for a persistent database issue.
+-   A MongoDB collection is being used as a fallback by the FastAPI backend to save orders when writing directly to Supabase fails.
+-   Placeholder files for the entire admin panel (, , etc.) and a corresponding Admin Auth Context have been created.
+-   Dependencies for the map feature (, ) have been installed.
 
 **Last working item**:
-- **Last item agent was working:** The agent was beginning the critical task of migrating the frontend from using mock data to fetching live data from the Supabase database. It queried the database to understand the schema and created new React hooks (, ) and updated the  to handle this transition.
-- **Status:** IN PROGRESS
-- **Agent Testing Done:** N
-- **Which testing method agent to use?** frontend testing agent (After the Supabase data is fully integrated into the UI components, the testing agent should be used to verify that menu items are displayed correctly, items can be added to the cart, and the checkout process can be initiated with real data.)
-- **User Testing Done:** N
+-   **Last item agent was working:** The agent was scaffolding the structure for the new, comprehensive admin panel. It installed  for the map feature and then created all the necessary placeholder files and components for the different admin sections (Login, Dashboard, Orders, Menu, Coupons, Loyalty, Zones, Settings) and the routing in .
+-   **Status:** IN PROGRESS
+-   **Agent Testing Done:** N
+-   **Which testing method agent to use?** both (The admin panel will have significant frontend UI and backend logic that needs testing. The map integration will require frontend testing, while the CRUD operations for menu, coupons, etc., will need backend testing.)
+-   **User Testing Done:** N
 
 **All Pending/In progress Issue list**:
-- **Issue 1: (P0) Missing  Table in Supabase:** The agent's own investigation revealed that the  table, which is critical for handling burger customizations (e.g., patty size, add-ons, sauces), does not exist in the Supabase database. This will block the integration of real menu data into the item detail modal.
-- **Issue 2: (P1) Real-time Order Status is Not Implemented:** The user requires a real-time order tracking system where statuses are updated from a POS/Admin panel. The current  page is a static placeholder.
+-   **Issue 1: (P0) Supabase Database Trigger Blocks Order Creation**
+-   **Issue 2: (P1) Checkout Fails for Addresses Outside Delivery Zones**
+-   **Issue 3: (P2) Admin Panel is Non-Functional**
 
 **Issues Detail:**
-- **Issue 1: Missing  Table in Supabase**
-    - **Attempted fixes:** None. The issue was just discovered.
-    - **Next debug checklist:**
-        1.  Verify if any other related tables are missing (e.g., ).
-        2.  Communicate with the user about the missing table.
-        3.  If authorized, create the  and  tables in Supabase based on the schema defined in the initial problem statement.
-    - **Why fix this issue and what will be achieved with the fix?** Without this table, the application cannot display or process any item customizations (like 'Double Patty' or 'Extra Cheese'), which is a core feature of ordering a burger. Fixing this will unblock the entire menu integration.
-    - **Status:** NOT STARTED
-    - **Is recurring issue?** N
-    - **Should Test frontend/backend/both after fix?** both (Backend for table creation, Frontend for displaying modifiers).
-    - **Blocked on other issue:** None. This is a primary blocker.
+-   **Issue 1: Supabase Database Trigger Blocks Order Creation**
+    -   **Attempted fixes:** The agent determined that a  trigger on the  table attempts to set the  from , which fails when using the Supabase service role key, resulting in a type-casting error ( to ). Numerous workarounds were attempted (creating a dedicated auth user, using RPC, trying different authentication flows). A temporary fix was implemented by creating a FastAPI backend that attempts to write to Supabase and falls back to a MongoDB collection on failure. The user was instructed to manually disable the trigger in their Supabase dashboard via SQL, but it's unconfirmed if this was done, as the error persists.
+    -   **Next debug checklist:**
+        1.  Confirm with the user if they have successfully executed the SQL command  in their Supabase dashboard.
+        2.  If the trigger is disabled, remove the MongoDB fallback logic from the backend () and have the frontend () write orders directly to Supabase to simplify the architecture as per the user's original request.
+        3.  If the trigger cannot be disabled, the current backend/MongoDB workaround must be maintained and built upon.
+    -   **Why fix this issue and what will be achieved with the fix?** Fixing this at the database level would remove the need for the complex FastAPI/MongoDB workaround, simplifying the tech stack and aligning with the user's all Supabase requirement. It's the root cause of the most significant development hurdle.
+    -   **Status:** IN PROGRESS
+    -   **Is recurring issue?** Y
+    -   **Should Test frontend/backend/both after fix?** backend
+    -   **Blocked on other issue:** Blocked on user action (running the SQL command).
 
-- **Issue 2: Real-time Order Status is Not Implemented**
-    - **Attempted fixes:** None.
-    - **Next debug checklist:**
-        1.  Implement Supabase's Realtime subscriptions in the  hook or directly in the  page.
-        2.  The component should listen for changes to the  column of the relevant order in the  table.
-        3.  Update the UI to reflect the new status dynamically.
-    - **Why fix this issue and what will be achieved with the fix?** This implements a key user requirement for a live order tracking experience, which is essential for customer satisfaction.
-    - **Status:** NOT STARTED
-    - **Is recurring issue?** N
-    - **Should Test frontend/backend/both after fix?** both (The frontend must be tested to see status updates. The backend logic that updates the status would need to be simulated or tested).
-    - **Blocked on other issue:** Blocked on Task 1: Complete Supabase Menu Data Integration and Task 2: Implement Order Creation. An order must be created before it can be tracked.
+-   **Issue 2: Checkout Fails for Addresses Outside Delivery Zones**
+    -   **Attempted fixes:** None. This is a new requirement.
+    -   **Next debug checklist:**
+        1.  Implement the delivery zone editor in the admin panel.
+        2.  Fetch and store these zones on the client-side during checkout.
+        3.  Use a library like  to check if the customer's selected address (lat/lng) falls within any defined delivery zone.
+        4.  If not, disable the Place Order button and show an error message.
+    -   **Why fix this issue and what will be achieved with the fix?** This is a core business logic requirement to prevent the restaurant from accepting orders it cannot fulfill.
+    -   **Status:** NOT STARTED
+    -   **Is recurring issue?** N
+    -   **Should Test frontend/backend/both after fix?** frontend
+    -   **Blocked on other issue:** Implement Admin Panel Delivery Zone Management task.
+
+-   **Issue 3: Admin Panel is Non-Functional**
+    -   **Attempted fixes:** None. The files have just been created.
+    -   **Next debug checklist:**
+        1.  Implement the login logic in  and  using Supabase Auth.
+        2.  Build out the UI and functionality for each admin page, starting with the Real-time Order Inbox ().
+    -   **Why fix this issue and what will be achieved with the fix?** This is the primary feature request of the current development phase.
+    -   **Status:** NOT STARTED
+    -   **Is recurring issue?** N
+    -   **Should Test frontend/backend/both after fix?** both
+    -   **Blocked on other issue:** None.
 
 **In progress Task List**:
-- **Task 1: (P0) Complete Supabase Menu Data Integration**
-    - **Where to resume:** The hooks () have been created. The next step is to integrate these hooks into the UI pages ( for Most Popular Items and  for the full menu) to replace the mock data with live data from Supabase.
-    - **What will be achieved with this?** The website will display the actual menu from the restaurant's database instead of hardcoded examples.
-    - **Status:** IN PROGRESS
-    - **Should Test frontend/backend/both after fix?** frontend
-    - **Blocked on something:** Blocked on Issue 1: Missing Table for full functionality.
+-   **Task 1: (P0) Build Admin Panel**
+    -   **Where to resume:** All placeholder files have been created in  and . The next step is to implement the admin login functionality in  and  using the credentials specified by the user.
+    -   **What will be achieved with this?** This will provide the core operational control panel for the restaurant as requested by the user.
+    -   **Status:** IN PROGRESS
+    -   **Should Test frontend/backend/both after fix?** both
+    -   **Blocked on something:** None.
 
 **Upcoming and Future Tasks**
-- **Upcoming Tasks:**
-    - **(P0) Implement Order Creation ():** Update the  page to send the final cart contents and customer information to the Supabase  table upon submission.
-    - **(P1) Re-add Pickup Option:** Update the UI in , , and the footer to include the Pickup option and display the restaurant's address.
-    - **(P1) Update Hero Text:** Change the banner text on  to OG BURGER MEAL.
-    - **(P2) Ensure Hostinger Deployment Compatibility:** Investigate Hostinger's deployment requirements for a Vite-based Node.js application and make any necessary configuration changes, potentially removing Vercel-specific files if they conflict.
+-   **Upcoming Tasks:**
+    -   **(P0) Implement Admin Login Page**: Build the UI and authentication logic for .
+    -   **(P0) Implement Real-time Order Inbox**: In , use Supabase Realtime to listen for new orders, play a continuous buzzer sound, and display order details.
+    -   **(P1) Implement Checkout Map Integration**: In , add the Leaflet/OpenStreetMap component for address selection and auto-fill.
+    -   **(P1) Implement Admin Delivery Zone Editor**: In , build the map-based interface for drawing polygon zones and setting fees.
+    -   **(P2) Implement Order Status Management**: Add buttons to the admin order inbox to update the order status in Supabase.
+    -   **(P2) Implement Receipt Generation**: Build the  component to match the user's sample and implement print/download functionality in the admin panel and customer tracking page.
+-   **Future Tasks:**
+    -   Implement full CRUD functionality for Menu, Coupons, and Loyalty in the respective admin pages.
+    -   Integrate the delivery zone validation and fee calculation into the checkout flow.
+    -   Make the application deployable on Hostinger (requires creating a production build and ensuring server configurations are compatible).
 
 **Completed work in this session**
-- Built a complete, responsive, and visually styled frontend UI from a reference project.
-- Implemented Bam Burgers' branding, including logo and color scheme.
-- Set up multi-language support for English and Arabic (with RTL).
-- Created all necessary pages and components for the user flow (Home, Menu, Modals, Cart, etc.) using mock data.
-- Handled multiple rounds of user feedback, including making the site delivery-only and then re-ordering homepage sections.
-- Created a  file to address Vercel deployment issues.
-- Began the pivot to a data-driven app by inspecting the Supabase DB and creating initial data-fetching hooks.
+-   Connected the frontend menu (Homepage Most Popular and Menu page) to fetch real-time data from Supabase.
+-   Updated hero banner text and re-added the Pickup option with the correct address.
+-   **Workaround Implemented**: Created a FastAPI backend with a MongoDB fallback to successfully create orders, bypassing the persistent Supabase DB trigger/RLS issue.
+-   Updated the frontend checkout page to use the new FastAPI endpoint for placing orders.
+-   Updated the order tracking page to successfully fetch order status from the backend.
+-   Installed  and  dependencies.
+-   Created the complete file and folder structure for the new admin panel feature.
 
 **Earlier issues found/mentioned but not fixed**
-- **Issue 1:  table is missing in Supabase.** The agent discovered this while inspecting the database but did not take action or report it before starting to create data-fetching logic.
+-   The root cause of the order creation failure, a **database trigger on the  table**, has been identified but not fixed. The user has been instructed to run SQL to disable it, but the agent proceeded with a workaround.
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
-- **Framework:** Next.js 14 with Vite
-- **Styling:** Tailwind CSS, shadcn/ui
-- **State Management:** React Context API
-- **Language:** TypeScript/React
-- **Database:** Supabase (PostgreSQL) - Direct client-side querying
-- **Authentication:** Firebase (planned for customer login)
+-   **Frontend:** Next.js (with Vite), React, TypeScript, Tailwind CSS, shadcn/ui
+-   **Backend (Workaround):** FastAPI (Python)
+-   **Database:** Supabase (PostgreSQL) for all data, MongoDB (used as a temporary fallback for orders)
+-   **Real-time:** Supabase Realtime (planned for admin order inbox)
+-   **Maps:** Leaflet / OpenStreetMap (planned for checkout and admin)
+-   **State Management:** React Context API
 
 **key DB schema**
-- : {id, tenant_id, name, ...}
-- : {id, tenant_id, name, description, price, image_url, category_id, ...}
-- : {id, tenant_id, customer_name, status, total, ...}
-- : **MISSING** (Expected: {id, item_id, name, price_modifier, ...})
-- : **MISSING** (Expected: {id, name, selection_type, ...})
+-   : {id, order_number, customer_name, total_amount, status, **user_id** (problematic column)}
+-   : {id, order_id, menu_item_id, quantity, price}
+-   : {id, name, price, category_id, ...}
+-   : {id, name, ...}
+-   : {id, name, geo_polygon, delivery_fee, min_order}
+-   : {id, code, discount_amount, ...}
+-   : {id, points_per_kwd, ...}
+-   : Custom user table for the POS system, separate from .
 
 **changes in tech stack**
-- The project was set up using Next.js with Vite, based on the reference Lovable project, which deviates from a standard Next.js setup but is functional.
+-   **Introduced a FastAPI backend ()** to act as a proxy/workaround for placing orders into the database.
+-   **Introduced MongoDB** as a fallback database for the FastAPI backend, which is a significant deviation from the user's all Supabase requirement.
 
 **All files of reference**
-- : Newly created hook to fetch menu categories and items from Supabase.
-- : Newly created hook placeholder for order creation and tracking.
-- : Overwritten to manage order state (delivery/pickup).
-- : The main homepage, needs to be updated to use .
-- : The menu page, needs to be updated to use .
-- : The checkout page, needs to be updated to create orders in Supabase.
-- : The order tracking page, needs to be updated for real-time status.
-- : Created to assist with Vercel deployment.
+-   **Created:**
+    -   : The new backend server.
+    -   All files under  (e.g., , , etc.).
+    -   All files under  (e.g., ).
+    -   .
+-   **Updated:**
+    -   : To use the new FastAPI backend endpoint for order creation.
+    -   : To fetch order details from the backend.
+    -   : To include all the new routes for the admin panel.
+    -   : Added .
 
 **Critical Info for New Agent**
-- The project has pivoted from a UI/mockup phase to a full-stack implementation phase. The user's priority is now a fully functional, data-driven application with no mock data.
-- The most critical blocker is the **missing  and  tables** in the Supabase database. You cannot complete the menu integration without addressing this. You must either create the tables as per the original requirements or confirm the schema with the user.
-- The user is in a hurry and has specifically asked not to waste time/tokens on unnecessary testing. Focus on delivering the requested features.
-- The user has mentioned deployment issues on Hostinger. While a  was added, you may need to research and provide a more platform-agnostic build configuration or specific instructions for Hostinger.
+-   **The Supabase database trigger on the  table is the single biggest blocker.** You must first confirm with the user if they have run the provided SQL command to disable it. If they have, you should prioritize removing the FastAPI/MongoDB workaround to simplify the architecture. If not, you will have to continue building on the existing workaround.
+-   The user is highly focused on results and has expressed frustration with a perceived lack of progress. Your first priority should be to deliver a visible, functional piece of the admin panel (e.g., the login page and the real-time order inbox) to rebuild trust.
+-   The entire admin panel is currently just a skeleton. You will be building it from scratch, starting with the login functionality.
+-   The user has approved using Supabase Auth for the admin user. You need to create the user  with the password  and implement the login flow.
 
 **documents and test reports created in this job**
-- 
+-   User-provided receipt sample: 
+-   User-provided logo: 
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User:** Requests to change the layout of the homepage, fix a scrolling issue, and asks for help with a Vercel 404 error.
-2.  **Agent:** Implements the layout change, adds a scroll-to-top component, and creates a  to fix the deployment issue.
-3.  **User:** Asks to add the pickup option back with a new address.
-4.  **User:** Provides a GitHub link to API docs.
-5.  **User:** Re-iterates the request to add pickup, provides a new address, and asks to change the hero banner text.
-6.  **User:** **CRITICAL:** Demands that all mock data be replaced with real data from Supabase, that order tracking be made real-time and controlled by an admin panel, and that the site be deployable on Hostinger. They re-provide all Supabase credentials and state they want to finalize the website now.
-7.  **Agent:** Acknowledges the requests and begins inspecting the Supabase database to understand the schema.
-8.  **Agent:** Successfully queries  and  tables from Supabase.
-9.  **Agent:** Discovers that the  table returns data but notes that  table cannot be found.
-10. **Agent:** Creates new hooks (, ) and updates  to prepare for the data integration.
+1.  **User:** (Frustrated) Complains that nothing is working: admin panel is a 404, checkout doesn't work, map isn't added. Asks if they need to do anything in Supabase.
+2.  **Agent:** Apologizes and agrees to re-evaluate and fix the issues properly.
+3.  **Agent:** Checks that the frontend and backend servers are running.
+4.  **User:** Re-iterates all requirements for the admin panel and new features in great detail, emphasizing no mock or demo mode and providing Supabase credentials again. Asks for a text summary of the plan before execution.
+5.  **Agent:** Provides a detailed, multi-phase plan addressing all user requirements and asks clarifying questions about Supabase access, admin auth method, and receipt details.
+6.  **User:** Approves the plan phase-by-phase. Confirms they have handled the Supabase changes (Done), prefers Supabase Auth for the admin user, and confirms the tables exist. Answers questions about the receipt. Re-iterates Now you can do it.
+7.  **Agent:** Starts work, but immediately finds the Supabase order creation trigger is still active.
+8.  **Agent:** Determines the user needs to run a more specific SQL command to fix the trigger.
+9.  **Agent:** Asks the user to run a  SQL command and proceeds to build the admin panel skeleton while waiting.
+10. **Agent:** Installs  and creates all the placeholder files for the admin panel pages and components.
 
 **Project Health Check:**
-- **Broken:** Backend connectivity, Order creation, Real-time order tracking, Display of item modifiers.
-- **Mocked:** All menu data currently displayed on the website.
+-   **Broken:**
+    -   Direct order creation to Supabase due to a database trigger. The FastAPI/MongoDB is a workaround, not a fix.
+-   **Mocked/Incomplete:**
+    -   The entire  panel is a non-functional skeleton of files and routes.
+    -   Checkout map integration, delivery zone validation, and receipt generation are not implemented.
 
 **3rd Party Integrations**
-- **Supabase (Database & Realtime):** Credentials provided. Used for storing all application data.
-- **Firebase (Authentication):** Credentials provided. Intended for customer sign-up and login.
+-   **Supabase:** Used for database, auth (planned for admin), and real-time features.
+-   **Firebase:** Configured but appears to be unused for the main order flow.
+-   **OpenStreetMap/Leaflet:** Planned for map features; dependencies are installed.
+-   **MongoDB:** Used as a fallback database via the FastAPI backend.
 
 **Testing status**
-- **Testing agent used after significant changes:** NO
-- **Troubleshoot agent used after agent stuck in loop:** NO
-- **Test files created:** None
-- **Known regressions:** The Pickup feature was implemented, then removed, and now needs to be re-implemented.
+-   **Testing agent used after significant changes:** NO
+-   **Troubleshoot agent used after agent stuck in loop:** NO
+-   **Test files created:** None
+-   **Known regressions:** None.
 
 **Credentials to test flow:**
-- Supabase and Firebase credentials have been provided by the user and are in .
+-   Supabase credentials are in  and .
+-   Admin credentials (to be created): Username: , Password: .
 
 **What agent forgot to execute**
-- The agent discovered the critical issue of the missing  table in Supabase but did not stop to address it or inform the user. It proceeded with creating data-fetching logic that will inevitably fail or be incomplete without the modifier data. This needs to be the first action item for the next agent.</analysis>
+-   The agent did not verify if the user's Done confirmation regarding the Supabase fix was actually successful before proceeding. It discovered the trigger issue was still present after the user claimed to have fixed it.
+-   The agent has created the file structure for the admin panel but has not implemented any of the actual functionality yet (login, order inbox, etc.).</analysis>
