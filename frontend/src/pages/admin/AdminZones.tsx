@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Plus, Edit, Trash2, Save, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { MapPin, Plus, Edit, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,39 +9,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase, TENANT_ID } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { MapContainer, TileLayer, Polygon, useMap, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-
-// Fix leaflet default marker icon
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
 
 interface DeliveryZone {
   id: string;
   name: string;
   name_ar?: string;
-  polygon: [number, number][];
+  polygon?: any;
   delivery_fee: number;
   min_order_amount: number;
   estimated_time?: string;
   status: string;
 }
 
-// Kuwait center coordinates
-const KUWAIT_CENTER: [number, number] = [29.3759, 47.9774];
-
 const AdminZones = () => {
   const [zones, setZones] = useState<DeliveryZone[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [editingZone, setEditingZone] = useState<DeliveryZone | null>(null);
-  const [drawingMode, setDrawingMode] = useState(false);
-  const [drawnPoints, setDrawnPoints] = useState<[number, number][]>([]);
   
   const [form, setForm] = useState({
     name: '',
@@ -65,17 +49,10 @@ const AdminZones = () => {
         .order('name', { ascending: true });
 
       if (error) throw error;
-
-      // Parse polygon data
-      const parsedZones = (data || []).map(zone => ({
-        ...zone,
-        polygon: typeof zone.polygon === 'string' ? JSON.parse(zone.polygon) : zone.polygon || [],
-      }));
-
-      setZones(parsedZones);
+      setZones(data || []);
     } catch (err) {
       console.error('Error fetching zones:', err);
-      toast.error('Failed to load delivery zones');
+      // Don't show error toast if table doesn't exist
     } finally {
       setLoading(false);
     }
@@ -88,15 +65,9 @@ const AdminZones = () => {
         return;
       }
 
-      if (drawnPoints.length < 3) {
-        toast.error('Please draw a zone with at least 3 points');
-        return;
-      }
-
       const zoneData = {
         name: form.name,
         name_ar: form.name_ar || null,
-        polygon: JSON.stringify(drawnPoints),
         delivery_fee: form.delivery_fee,
         min_order_amount: form.min_order_amount,
         estimated_time: form.estimated_time || null,
@@ -160,8 +131,6 @@ const AdminZones = () => {
       status: 'active',
     });
     setEditingZone(null);
-    setDrawnPoints([]);
-    setDrawingMode(false);
   };
 
   const openEdit = (zone: DeliveryZone) => {
@@ -169,25 +138,12 @@ const AdminZones = () => {
     setForm({
       name: zone.name,
       name_ar: zone.name_ar || '',
-      delivery_fee: zone.delivery_fee,
-      min_order_amount: zone.min_order_amount,
+      delivery_fee: zone.delivery_fee || 0,
+      min_order_amount: zone.min_order_amount || 0,
       estimated_time: zone.estimated_time || '30-45 min',
       status: zone.status,
     });
-    setDrawnPoints(zone.polygon || []);
     setShowDialog(true);
-  };
-
-  // Map click handler component
-  const MapClickHandler = () => {
-    useMapEvents({
-      click: (e) => {
-        if (drawingMode) {
-          setDrawnPoints(prev => [...prev, [e.latlng.lat, e.latlng.lng]]);
-        }
-      },
-    });
-    return null;
   };
 
   // Generate random color for zone
@@ -217,39 +173,17 @@ const AdminZones = () => {
         </Button>
       </div>
 
-      {/* Map Overview */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MapPin className="h-5 w-5" />
-            Zone Overview
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[400px] rounded-lg overflow-hidden">
-            <MapContainer
-              center={KUWAIT_CENTER}
-              zoom={11}
-              style={{ height: '100%', width: '100%' }}
-            >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-              {zones.map((zone, index) => (
-                zone.polygon && zone.polygon.length > 0 && (
-                  <Polygon
-                    key={zone.id}
-                    positions={zone.polygon}
-                    pathOptions={{
-                      color: getZoneColor(index),
-                      fillColor: getZoneColor(index),
-                      fillOpacity: 0.3,
-                    }}
-                  />
-                )
-              ))}
-            </MapContainer>
+      {/* Info Card */}
+      <Card className="bg-blue-50 border-blue-200">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <MapPin className="h-5 w-5 text-blue-600 mt-0.5" />
+            <div>
+              <p className="font-medium text-blue-900">Delivery Zone Management</p>
+              <p className="text-sm text-blue-800 mt-1">
+                Configure delivery zones for your restaurant. Set delivery fees and minimum order amounts for each area.
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -277,11 +211,11 @@ const AdminZones = () => {
               <div className="mt-4 space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Delivery Fee:</span>
-                  <span className="font-medium">{zone.delivery_fee.toFixed(3)} KWD</span>
+                  <span className="font-medium">{(zone.delivery_fee || 0).toFixed(3)} KWD</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Min Order:</span>
-                  <span className="font-medium">{zone.min_order_amount.toFixed(3)} KWD</span>
+                  <span className="font-medium">{(zone.min_order_amount || 0).toFixed(3)} KWD</span>
                 </div>
                 {zone.estimated_time && (
                   <div className="flex justify-between">
@@ -313,7 +247,7 @@ const AdminZones = () => {
 
       {/* Zone Dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editingZone ? 'Edit Zone' : 'Add Zone'}</DialogTitle>
           </DialogHeader>
@@ -338,7 +272,7 @@ const AdminZones = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Delivery Fee (KWD)</Label>
                 <Input
@@ -357,6 +291,17 @@ const AdminZones = () => {
                   onChange={(e) => setForm({ ...form, min_order_amount: parseFloat(e.target.value) || 0 })}
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Estimated Time</Label>
+                <Input
+                  value={form.estimated_time}
+                  onChange={(e) => setForm({ ...form, estimated_time: e.target.value })}
+                  placeholder="e.g. 30-45 min"
+                />
+              </div>
               <div className="space-y-2">
                 <Label>Status</Label>
                 <Select 
@@ -372,74 +317,6 @@ const AdminZones = () => {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Estimated Delivery Time</Label>
-              <Input
-                value={form.estimated_time}
-                onChange={(e) => setForm({ ...form, estimated_time: e.target.value })}
-                placeholder="e.g. 30-45 min"
-              />
-            </div>
-
-            {/* Map for drawing zone */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Draw Zone on Map</Label>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant={drawingMode ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setDrawingMode(!drawingMode)}
-                  >
-                    {drawingMode ? 'Stop Drawing' : 'Start Drawing'}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setDrawnPoints([])}
-                  >
-                    Clear
-                  </Button>
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {drawingMode 
-                  ? 'Click on the map to add points. Add at least 3 points to create a zone.'
-                  : 'Click "Start Drawing" to begin drawing the delivery zone.'
-                }
-              </p>
-              <div className="h-[300px] rounded-lg overflow-hidden border">
-                <MapContainer
-                  center={KUWAIT_CENTER}
-                  zoom={11}
-                  style={{ height: '100%', width: '100%' }}
-                >
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-                  <MapClickHandler />
-                  {drawnPoints.length >= 3 && (
-                    <Polygon
-                      positions={drawnPoints}
-                      pathOptions={{
-                        color: '#ef4444',
-                        fillColor: '#ef4444',
-                        fillOpacity: 0.3,
-                      }}
-                    />
-                  )}
-                </MapContainer>
-              </div>
-              {drawnPoints.length > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  {drawnPoints.length} point(s) added
-                </p>
-              )}
             </div>
           </div>
           <DialogFooter>
