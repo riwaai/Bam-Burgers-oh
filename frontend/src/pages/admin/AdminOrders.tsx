@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, BellOff, Printer, Check, ChefHat, Package, Truck, Eye, X, RefreshCw } from 'lucide-react';
+import { Bell, BellOff, Printer, Check, ChefHat, Package, Truck, Eye, X, RefreshCw, Ban } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { supabase, TENANT_ID } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import OrderReceipt from '@/components/admin/OrderReceipt';
-import { useReactToPrint } from 'react-to-print';
+import html2canvas from 'html2canvas';
 
 type OrderStatus = 'pending' | 'accepted' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'completed' | 'cancelled';
 
@@ -54,8 +54,8 @@ const statusConfig: Record<OrderStatus, { label: string; color: string; bgColor:
   cancelled: { label: 'Cancelled', color: 'text-red-800', bgColor: 'bg-red-500', icon: X },
 };
 
-// Buzzer sound - longer continuous alert
-const BUZZER_SOUND = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQsZVrPq5bF+GQg1l+Ts8L2jLQAkhtXy+9TQVQAWadnu/+ThfgAMTcXy//zz0nkAFErI9P/99e+wYgAXRcL2//718MOADgA/QMHY9PL27ObYwYVxOSolMUBng6u9xcnExb6ypYpjPykVEB41WXuVq7W6tK6mmYpuUTQhGiEwSGF5i5ieoZ2YkYZ4Z1I+Lh8bJDZLXm54goiKiIWAeXBkVUU3KiAcIjBBUmJucHd6e3l2cm1nX1VKQDU1';
+// Loud buzzer sound - continuous alert tone
+const BUZZER_SOUND_URL = 'https://www.soundjay.com/button/sounds/beep-07.mp3';
 
 const AdminOrders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -64,21 +64,17 @@ const AdminOrders = () => {
   const [buzzerEnabled, setBuzzerEnabled] = useState(true);
   const [showReceipt, setShowReceipt] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
   const lastPendingCountRef = useRef(0);
   const buzzerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Print handler
-  const handlePrint = useReactToPrint({
-    contentRef: receiptRef,
-    documentTitle: `Receipt-${selectedOrder?.order_number}`,
-  });
-
   // Initialize audio
   useEffect(() => {
-    audioRef.current = new Audio(BUZZER_SOUND);
-    audioRef.current.loop = false; // We'll manually loop with interval
+    audioRef.current = new Audio(BUZZER_SOUND_URL);
+    audioRef.current.loop = false;
+    audioRef.current.volume = 1.0;
 
     return () => {
       if (buzzerIntervalRef.current) {
@@ -107,8 +103,8 @@ const AdminOrders = () => {
         console.log('Realtime subscription status:', status);
       });
 
-    // Poll every 30 seconds as backup
-    const pollInterval = setInterval(fetchOrders, 30000);
+    // Poll every 15 seconds as backup
+    const pollInterval = setInterval(fetchOrders, 15000);
 
     return () => {
       supabase.removeChannel(channel);
@@ -116,7 +112,7 @@ const AdminOrders = () => {
     };
   }, []);
 
-  // Buzzer effect for pending orders
+  // Buzzer effect for pending orders - LOUD and CONTINUOUS
   useEffect(() => {
     const pendingCount = orders.filter((o) => o.status === 'pending').length;
 
@@ -124,12 +120,12 @@ const AdminOrders = () => {
       // Start buzzer if we have pending orders
       if (!buzzerIntervalRef.current) {
         // Play immediately
-        audioRef.current?.play().catch(() => {});
+        playBuzzer();
         
-        // Set interval to keep buzzing
+        // Set interval to keep buzzing every 2 seconds (more frequent)
         buzzerIntervalRef.current = setInterval(() => {
-          audioRef.current?.play().catch(() => {});
-        }, 3000); // Buzz every 3 seconds
+          playBuzzer();
+        }, 2000);
       }
       
       // Show toast for new orders
@@ -141,16 +137,29 @@ const AdminOrders = () => {
       }
     } else {
       // Stop buzzer if no pending orders
-      if (buzzerIntervalRef.current) {
-        clearInterval(buzzerIntervalRef.current);
-        buzzerIntervalRef.current = null;
-      }
-      audioRef.current?.pause();
-      if (audioRef.current) audioRef.current.currentTime = 0;
+      stopBuzzer();
     }
 
     lastPendingCountRef.current = pendingCount;
   }, [orders, buzzerEnabled]);
+
+  const playBuzzer = () => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(err => {
+        console.log('Audio play failed:', err);
+      });
+    }
+  };
+
+  const stopBuzzer = () => {
+    if (buzzerIntervalRef.current) {
+      clearInterval(buzzerIntervalRef.current);
+      buzzerIntervalRef.current = null;
+    }
+    audioRef.current?.pause();
+    if (audioRef.current) audioRef.current.currentTime = 0;
+  };
 
   const fetchOrders = async () => {
     try {
@@ -183,13 +192,19 @@ const AdminOrders = () => {
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+    setUpdatingStatus(orderId);
     try {
-      const updateData: any = { status: newStatus, updated_at: new Date().toISOString() };
+      const updateData: any = { 
+        status: newStatus, 
+        updated_at: new Date().toISOString() 
+      };
 
       if (newStatus === 'accepted') {
         updateData.accepted_at = new Date().toISOString();
-      } else if (newStatus === 'delivered' || newStatus === 'completed' || newStatus === 'cancelled') {
+      } else if (newStatus === 'delivered' || newStatus === 'completed') {
         updateData.completed_at = new Date().toISOString();
+      } else if (newStatus === 'cancelled') {
+        updateData.cancelled_at = new Date().toISOString();
       }
 
       const { error } = await supabase
@@ -197,18 +212,30 @@ const AdminOrders = () => {
         .update(updateData)
         .eq('id', orderId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase update error:', error);
+        throw error;
+      }
 
       toast.success(`Order status updated to ${statusConfig[newStatus].label}`);
-      fetchOrders();
+      
+      // Immediately update local state
+      setOrders(prev => prev.map(o => 
+        o.id === orderId ? { ...o, status: newStatus } : o
+      ));
 
       // Update selected order if open
       if (selectedOrder?.id === orderId) {
         setSelectedOrder((prev) => (prev ? { ...prev, status: newStatus } : null));
       }
+
+      // Refresh from server
+      fetchOrders();
     } catch (err) {
       console.error('Error updating order:', err);
       toast.error('Failed to update order status');
+    } finally {
+      setUpdatingStatus(null);
     }
   };
 
@@ -234,13 +261,7 @@ const AdminOrders = () => {
   const toggleBuzzer = () => {
     setBuzzerEnabled((prev) => {
       if (prev) {
-        // Turning off
-        if (buzzerIntervalRef.current) {
-          clearInterval(buzzerIntervalRef.current);
-          buzzerIntervalRef.current = null;
-        }
-        audioRef.current?.pause();
-        if (audioRef.current) audioRef.current.currentTime = 0;
+        stopBuzzer();
       }
       return !prev;
     });
@@ -253,6 +274,28 @@ const AdminOrders = () => {
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  // Print receipt as image
+  const handlePrintReceipt = async () => {
+    if (!receiptRef.current) return;
+    
+    try {
+      const canvas = await html2canvas(receiptRef.current, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+      });
+      
+      const link = document.createElement('a');
+      link.download = `receipt-${selectedOrder?.order_number}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      
+      toast.success('Receipt downloaded!');
+    } catch (err) {
+      console.error('Error generating receipt:', err);
+      toast.error('Failed to generate receipt');
+    }
   };
 
   // Filter orders
@@ -287,7 +330,7 @@ const AdminOrders = () => {
 
       {/* Status Filter */}
       <div className="flex flex-wrap gap-2">
-        {['all', 'pending', 'accepted', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'completed'].map((status) => (
+        {['all', 'pending', 'accepted', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled'].map((status) => (
           <Button
             key={status}
             variant={statusFilter === status ? 'default' : 'outline'}
@@ -329,6 +372,7 @@ const AdminOrders = () => {
           {filteredOrders.map((order) => {
             const config = statusConfig[order.status] || statusConfig.pending;
             const nextStatus = getNextStatus(order.status);
+            const isUpdating = updatingStatus === order.id;
 
             return (
               <Card
@@ -358,7 +402,7 @@ const AdminOrders = () => {
                   <div className="text-sm">
                     <span className="font-medium">Type:</span>{' '}
                     <Badge variant="outline">
-                      {order.order_type === 'pickup' || order.order_type === 'qsr' ? 'Pickup/QSR' : 'Delivery'}
+                      {order.order_type === 'pickup' || order.order_type === 'qsr' ? 'Pickup' : 'Delivery'}
                     </Badge>
                   </div>
 
@@ -374,7 +418,7 @@ const AdminOrders = () => {
                   )}
 
                   <div className="flex items-center justify-between pt-2 border-t">
-                    <span className="text-lg font-bold">{order.total_amount?.toFixed(3)} KWD</span>
+                    <span className="text-lg font-bold">{(order.total_amount || 0).toFixed(3)} KWD</span>
                     <div className="flex gap-2">
                       <Button
                         size="sm"
@@ -387,6 +431,12 @@ const AdminOrders = () => {
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  {order.status !== 'cancelled' && order.status !== 'delivered' && order.status !== 'completed' && (
+                    <div className="flex gap-2 pt-2">
                       {nextStatus && (
                         <Button
                           size="sm"
@@ -394,13 +444,27 @@ const AdminOrders = () => {
                             e.stopPropagation();
                             updateOrderStatus(order.id, nextStatus);
                           }}
-                          className={statusConfig[nextStatus].bgColor}
+                          className={`flex-1 ${statusConfig[nextStatus].bgColor}`}
+                          disabled={isUpdating}
                         >
-                          {statusConfig[nextStatus].label}
+                          {isUpdating ? 'Updating...' : statusConfig[nextStatus].label}
                         </Button>
                       )}
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm('Are you sure you want to reject this order?')) {
+                            updateOrderStatus(order.id, 'cancelled');
+                          }
+                        }}
+                        disabled={isUpdating}
+                      >
+                        <Ban className="h-4 w-4" />
+                      </Button>
                     </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             );
@@ -458,10 +522,10 @@ const AdminOrders = () => {
                           <div>
                             <p className="font-medium">{item.item_name_en}</p>
                             {item.item_name_ar && <p className="text-sm text-muted-foreground">{item.item_name_ar}</p>}
-                            <p className="text-sm text-muted-foreground">Qty: {item.quantity} × {item.unit_price?.toFixed(3)} KWD</p>
+                            <p className="text-sm text-muted-foreground">Qty: {item.quantity} × {(item.unit_price || 0).toFixed(3)} KWD</p>
                             {item.notes && <p className="text-sm text-orange-600">Note: {item.notes}</p>}
                           </div>
-                          <span className="font-medium">{item.total_price?.toFixed(3)} KWD</span>
+                          <span className="font-medium">{(item.total_price || 0).toFixed(3)} KWD</span>
                         </div>
                       ))
                     ) : (
@@ -482,23 +546,65 @@ const AdminOrders = () => {
                 <div className="border-t pt-4">
                   <div className="flex justify-between text-sm">
                     <span>Subtotal</span>
-                    <span>{selectedOrder.subtotal?.toFixed(3)} KWD</span>
+                    <span>{(selectedOrder.subtotal || 0).toFixed(3)} KWD</span>
                   </div>
                   {selectedOrder.discount_amount > 0 && (
                     <div className="flex justify-between text-sm text-green-600">
                       <span>Discount</span>
-                      <span>-{selectedOrder.discount_amount?.toFixed(3)} KWD</span>
+                      <span>-{(selectedOrder.discount_amount || 0).toFixed(3)} KWD</span>
                     </div>
                   )}
                   <div className="flex justify-between text-sm">
                     <span>Delivery Fee</span>
-                    <span>{selectedOrder.delivery_fee?.toFixed(3)} KWD</span>
+                    <span>{(selectedOrder.delivery_fee || 0).toFixed(3)} KWD</span>
                   </div>
                   <div className="flex justify-between font-bold text-lg mt-2 pt-2 border-t">
                     <span>Total</span>
-                    <span>{selectedOrder.total_amount?.toFixed(3)} KWD</span>
+                    <span>{(selectedOrder.total_amount || 0).toFixed(3)} KWD</span>
                   </div>
                 </div>
+
+                {/* Status Update Buttons */}
+                {selectedOrder.status !== 'cancelled' && selectedOrder.status !== 'delivered' && selectedOrder.status !== 'completed' && (
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h3 className="font-semibold mb-3">Update Status</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {statusFlow.map((status) => {
+                        const currentIndex = statusFlow.indexOf(selectedOrder.status);
+                        const statusIndex = statusFlow.indexOf(status);
+                        const isNext = statusIndex === currentIndex + 1;
+                        const isCurrent = status === selectedOrder.status;
+                        const isPast = statusIndex < currentIndex;
+                        
+                        return (
+                          <Button
+                            key={status}
+                            size="sm"
+                            variant={isCurrent ? 'default' : isNext ? 'default' : 'outline'}
+                            className={isNext ? statusConfig[status].bgColor : ''}
+                            disabled={isPast || isCurrent || updatingStatus === selectedOrder.id}
+                            onClick={() => updateOrderStatus(selectedOrder.id, status)}
+                          >
+                            {statusConfig[status].label}
+                          </Button>
+                        );
+                      })}
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => {
+                          if (confirm('Are you sure you want to reject this order?')) {
+                            updateOrderStatus(selectedOrder.id, 'cancelled');
+                          }
+                        }}
+                        disabled={updatingStatus === selectedOrder.id}
+                      >
+                        <Ban className="h-4 w-4 mr-1" />
+                        Reject
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Actions */}
                 <div className="flex gap-3">
@@ -508,16 +614,8 @@ const AdminOrders = () => {
                     className="flex-1"
                   >
                     <Printer className="h-4 w-4 mr-2" />
-                    Print Receipt
+                    View Receipt
                   </Button>
-                  {getNextStatus(selectedOrder.status) && (
-                    <Button
-                      onClick={() => updateOrderStatus(selectedOrder.id, getNextStatus(selectedOrder.status)!)}
-                      className={`flex-1 ${statusConfig[getNextStatus(selectedOrder.status)!].bgColor}`}
-                    >
-                      Mark as {statusConfig[getNextStatus(selectedOrder.status)!].label}
-                    </Button>
-                  )}
                 </div>
               </div>
             </>
@@ -529,18 +627,18 @@ const AdminOrders = () => {
       <Dialog open={showReceipt} onOpenChange={() => setShowReceipt(false)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Print Receipt</DialogTitle>
+            <DialogTitle>Order Receipt</DialogTitle>
           </DialogHeader>
-          <div ref={receiptRef}>
+          <div ref={receiptRef} className="bg-white">
             {selectedOrder && <OrderReceipt order={selectedOrder} />}
           </div>
           <div className="flex gap-3 mt-4">
             <Button variant="outline" onClick={() => setShowReceipt(false)} className="flex-1">
               Close
             </Button>
-            <Button onClick={() => handlePrint()} className="flex-1">
+            <Button onClick={handlePrintReceipt} className="flex-1">
               <Printer className="h-4 w-4 mr-2" />
-              Print
+              Download PNG
             </Button>
           </div>
         </DialogContent>
