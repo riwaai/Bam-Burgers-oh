@@ -15,11 +15,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import { cn } from '@/lib/utils';
-
-const LOGO_URL = 'https://customer-assets.emergentagent.com/job_bam-delivery/artifacts/gxx028af_Logo.png';
+import { LOGO_URL } from '@/integrations/supabase/client';
 
 const navItems = [
-  { path: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
+  { path: '/admin', icon: LayoutDashboard, label: 'Dashboard', exact: true },
   { path: '/admin/orders', icon: ShoppingCart, label: 'Orders' },
   { path: '/admin/menu', icon: UtensilsCrossed, label: 'Menu' },
   { path: '/admin/coupons', icon: Tag, label: 'Coupons' },
@@ -56,6 +55,13 @@ const AdminLayout = () => {
   if (!isAuthenticated) {
     return null;
   }
+
+  const isActiveRoute = (path: string, exact?: boolean) => {
+    if (exact) {
+      return location.pathname === path;
+    }
+    return location.pathname.startsWith(path);
+  };
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -94,7 +100,7 @@ const AdminLayout = () => {
         {/* Navigation */}
         <nav className="p-4 space-y-1">
           {navItems.map((item) => {
-            const isActive = location.pathname === item.path;
+            const isActive = isActiveRoute(item.path, item.exact);
             return (
               <Link
                 key={item.path}
@@ -117,7 +123,7 @@ const AdminLayout = () => {
         {/* User & Logout */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-800">
           <div className="text-sm text-gray-400 mb-2 truncate">
-            {admin?.email}
+            Logged in as: <span className="text-white font-medium">{admin?.username}</span>
           </div>
           <Button
             variant="ghost"
