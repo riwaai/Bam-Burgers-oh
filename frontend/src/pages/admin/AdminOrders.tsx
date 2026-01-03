@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, BellOff, Printer, Check, ChefHat, Package, Truck, Eye } from 'lucide-react';
+import { Bell, BellOff, Printer, Check, ChefHat, Package, Truck, Eye, X, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,12 +9,23 @@ import { toast } from 'sonner';
 import OrderReceipt from '@/components/admin/OrderReceipt';
 import { useReactToPrint } from 'react-to-print';
 
-type OrderStatus = 'pending' | 'accepted' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
+type OrderStatus = 'pending' | 'accepted' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'completed' | 'cancelled';
+
+interface OrderItem {
+  id: string;
+  item_name_en: string;
+  item_name_ar: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  notes?: string;
+}
 
 interface Order {
   id: string;
   order_number: string;
   order_type: string;
+  channel?: string;
   status: OrderStatus;
   customer_name: string;
   customer_phone: string;
@@ -27,20 +38,24 @@ interface Order {
   total_amount: number;
   notes: string | null;
   created_at: string;
-  items?: any[];
+  items?: OrderItem[];
 }
 
 const statusFlow: OrderStatus[] = ['pending', 'accepted', 'preparing', 'ready', 'out_for_delivery', 'delivered'];
 
-const statusConfig: Record<OrderStatus, { label: string; color: string; icon: any }> = {
-  pending: { label: 'Order Placed', color: 'bg-yellow-500', icon: Bell },
-  accepted: { label: 'Accepted', color: 'bg-blue-500', icon: Check },
-  preparing: { label: 'Preparing', color: 'bg-orange-500', icon: ChefHat },
-  ready: { label: 'Ready', color: 'bg-purple-500', icon: Package },
-  out_for_delivery: { label: 'Out for Delivery', color: 'bg-indigo-500', icon: Truck },
-  delivered: { label: 'Delivered', color: 'bg-green-500', icon: Check },
-  cancelled: { label: 'Cancelled', color: 'bg-red-500', icon: BellOff },
+const statusConfig: Record<OrderStatus, { label: string; color: string; bgColor: string; icon: any }> = {
+  pending: { label: 'Order Placed', color: 'text-yellow-800', bgColor: 'bg-yellow-500', icon: Bell },
+  accepted: { label: 'Accepted', color: 'text-blue-800', bgColor: 'bg-blue-500', icon: Check },
+  preparing: { label: 'Preparing', color: 'text-orange-800', bgColor: 'bg-orange-500', icon: ChefHat },
+  ready: { label: 'Ready', color: 'text-purple-800', bgColor: 'bg-purple-500', icon: Package },
+  out_for_delivery: { label: 'Out for Delivery', color: 'text-indigo-800', bgColor: 'bg-indigo-500', icon: Truck },
+  delivered: { label: 'Delivered', color: 'text-green-800', bgColor: 'bg-green-500', icon: Check },
+  completed: { label: 'Completed', color: 'text-green-800', bgColor: 'bg-green-500', icon: Check },
+  cancelled: { label: 'Cancelled', color: 'text-red-800', bgColor: 'bg-red-500', icon: X },
 };
+
+// Buzzer sound - longer continuous alert
+const BUZZER_SOUND = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQsZVrPq5bF+GQg1l+Ts8L2jLQAkhtXy+9TQVQAWadnu/+ThfgAMTcXy//zz0nkAFErI9P/99e+wYgAXRcL2//718MOADgA/QMHY9PL27ObYwYVxOSolMUBng6u9xcnExb6ypYpjPykVEB41WXuVq7W6tK6mmYpuUTQhGiEwSGF5i5ieoZ2YkYZ4Z1I+Lh8bJDZLXm54goiKiIWAeXBkVUU3KiAcIjBBUmJucHd6e3l2cm1nX1VKQDU1';
 
 const AdminOrders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -48,21 +63,33 @@ const AdminOrders = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [buzzerEnabled, setBuzzerEnabled] = useState(true);
   const [showReceipt, setShowReceipt] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
   const lastPendingCountRef = useRef(0);
+  const buzzerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Print handler
   const handlePrint = useReactToPrint({
-    content: () => receiptRef.current,
+    contentRef: receiptRef,
     documentTitle: `Receipt-${selectedOrder?.order_number}`,
   });
 
+  // Initialize audio
   useEffect(() => {
-    // Create audio element for buzzer
-    audioRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQsZVrPq5bF+GQg1l+Ts8L2jLQAkhtXy+9TQVQAWadnu/+ThfgAMTcXy//zz0nkAFErI9P/99e+wYgAXRcL2//318MOADgA/QMHY9PL27ObYwYVxOSolMUBng6u9xcnExb6ypYpjPykVEB41WXuVq7W6tK6mmYpuUTQhGiEwSGF5i5ieoZ2YkYZ4Z1I+Lh8bJDZLXm54goiKiIWAeXBkVUU3KiAcIjBBUmJucHd6e3l2cm1nX1VKQDU1');  // Simple beep
-    audioRef.current.loop = true;
+    audioRef.current = new Audio(BUZZER_SOUND);
+    audioRef.current.loop = false; // We'll manually loop with interval
 
+    return () => {
+      if (buzzerIntervalRef.current) {
+        clearInterval(buzzerIntervalRef.current);
+      }
+      audioRef.current?.pause();
+    };
+  }, []);
+
+  // Fetch orders and subscribe to realtime
+  useEffect(() => {
     fetchOrders();
 
     // Subscribe to realtime changes
@@ -72,17 +99,20 @@ const AdminOrders = () => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders', filter: `tenant_id=eq.${TENANT_ID}` },
         (payload) => {
-          console.log('Order change:', payload);
+          console.log('Order change received:', payload);
           fetchOrders();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Realtime subscription status:', status);
+      });
+
+    // Poll every 30 seconds as backup
+    const pollInterval = setInterval(fetchOrders, 30000);
 
     return () => {
       supabase.removeChannel(channel);
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
+      clearInterval(pollInterval);
     };
   }, []);
 
@@ -90,12 +120,31 @@ const AdminOrders = () => {
   useEffect(() => {
     const pendingCount = orders.filter((o) => o.status === 'pending').length;
 
-    if (buzzerEnabled && pendingCount > 0 && pendingCount > lastPendingCountRef.current) {
-      // New pending order - play buzzer
-      audioRef.current?.play().catch(() => {});
-      toast.warning('New order received!', { duration: 10000 });
-    } else if (pendingCount === 0) {
-      // No pending orders - stop buzzer
+    if (buzzerEnabled && pendingCount > 0) {
+      // Start buzzer if we have pending orders
+      if (!buzzerIntervalRef.current) {
+        // Play immediately
+        audioRef.current?.play().catch(() => {});
+        
+        // Set interval to keep buzzing
+        buzzerIntervalRef.current = setInterval(() => {
+          audioRef.current?.play().catch(() => {});
+        }, 3000); // Buzz every 3 seconds
+      }
+      
+      // Show toast for new orders
+      if (pendingCount > lastPendingCountRef.current) {
+        toast.warning(`🔔 ${pendingCount} pending order(s) waiting!`, { 
+          duration: 10000,
+          id: 'pending-orders'
+        });
+      }
+    } else {
+      // Stop buzzer if no pending orders
+      if (buzzerIntervalRef.current) {
+        clearInterval(buzzerIntervalRef.current);
+        buzzerIntervalRef.current = null;
+      }
       audioRef.current?.pause();
       if (audioRef.current) audioRef.current.currentTime = 0;
     }
@@ -127,6 +176,7 @@ const AdminOrders = () => {
       setOrders(ordersWithItems);
     } catch (err) {
       console.error('Error fetching orders:', err);
+      toast.error('Failed to fetch orders');
     } finally {
       setLoading(false);
     }
@@ -138,7 +188,7 @@ const AdminOrders = () => {
 
       if (newStatus === 'accepted') {
         updateData.accepted_at = new Date().toISOString();
-      } else if (newStatus === 'delivered' || newStatus === 'cancelled') {
+      } else if (newStatus === 'delivered' || newStatus === 'completed' || newStatus === 'cancelled') {
         updateData.completed_at = new Date().toISOString();
       }
 
@@ -184,6 +234,11 @@ const AdminOrders = () => {
   const toggleBuzzer = () => {
     setBuzzerEnabled((prev) => {
       if (prev) {
+        // Turning off
+        if (buzzerIntervalRef.current) {
+          clearInterval(buzzerIntervalRef.current);
+          buzzerIntervalRef.current = null;
+        }
         audioRef.current?.pause();
         if (audioRef.current) audioRef.current.currentTime = 0;
       }
@@ -191,27 +246,69 @@ const AdminOrders = () => {
     });
   };
 
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  // Filter orders
+  const filteredOrders = statusFilter === 'all' 
+    ? orders 
+    : orders.filter(o => o.status === statusFilter);
+
+  const pendingCount = orders.filter(o => o.status === 'pending').length;
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Orders</h1>
-        <Button
-          variant={buzzerEnabled ? 'default' : 'outline'}
-          onClick={toggleBuzzer}
-          className="gap-2"
-        >
-          {buzzerEnabled ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
-          Buzzer {buzzerEnabled ? 'On' : 'Off'}
-        </Button>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Orders</h1>
+          <p className="text-muted-foreground">Manage incoming orders</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={fetchOrders}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+          <Button
+            variant={buzzerEnabled ? 'default' : 'outline'}
+            onClick={toggleBuzzer}
+            className="gap-2"
+          >
+            {buzzerEnabled ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
+            Buzzer {buzzerEnabled ? 'On' : 'Off'}
+          </Button>
+        </div>
+      </div>
+
+      {/* Status Filter */}
+      <div className="flex flex-wrap gap-2">
+        {['all', 'pending', 'accepted', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'completed'].map((status) => (
+          <Button
+            key={status}
+            variant={statusFilter === status ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setStatusFilter(status)}
+          >
+            {status === 'all' ? 'All' : statusConfig[status as OrderStatus]?.label || status}
+            {status === 'pending' && pendingCount > 0 && (
+              <Badge className="ml-2 bg-yellow-500">{pendingCount}</Badge>
+            )}
+          </Button>
+        ))}
       </div>
 
       {/* Pending Orders Alert */}
-      {orders.filter((o) => o.status === 'pending').length > 0 && (
+      {pendingCount > 0 && (
         <div className="bg-yellow-100 border-l-4 border-yellow-500 p-4 rounded animate-pulse">
           <div className="flex items-center gap-2">
-            <Bell className="h-5 w-5 text-yellow-600" />
+            <Bell className="h-5 w-5 text-yellow-600 animate-bounce" />
             <span className="font-medium text-yellow-800">
-              {orders.filter((o) => o.status === 'pending').length} pending order(s) waiting for acceptance!
+              🔔 {pendingCount} pending order(s) waiting for acceptance!
             </span>
           </div>
         </div>
@@ -219,53 +316,71 @@ const AdminOrders = () => {
 
       {/* Orders Grid */}
       {loading ? (
-        <div className="text-center py-12">Loading orders...</div>
-      ) : orders.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">No orders yet</div>
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-2 text-muted-foreground">Loading orders...</p>
+        </div>
+      ) : filteredOrders.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          No orders found
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {orders.map((order) => {
-            const config = statusConfig[order.status];
+          {filteredOrders.map((order) => {
+            const config = statusConfig[order.status] || statusConfig.pending;
             const nextStatus = getNextStatus(order.status);
 
             return (
               <Card
                 key={order.id}
-                className={`cursor-pointer hover:shadow-lg transition-shadow ${
+                className={`cursor-pointer hover:shadow-lg transition-all ${
                   order.status === 'pending' ? 'ring-2 ring-yellow-500 animate-pulse' : ''
                 }`}
               >
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">#{order.order_number}</CardTitle>
-                    <Badge className={`${config.color} text-white`}>
+                    <Badge className={`${config.bgColor} text-white`}>
                       {config.label}
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {new Date(order.created_at).toLocaleString()}
+                    {formatDate(order.created_at)}
+                    {order.channel && <span className="ml-2">• {order.channel}</span>}
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div>
-                    <p className="font-medium">{order.customer_name}</p>
-                    <p className="text-sm text-muted-foreground">{order.customer_phone}</p>
+                    <p className="font-medium">{order.customer_name || 'Guest'}</p>
+                    <p className="text-sm text-muted-foreground">{order.customer_phone || 'No phone'}</p>
                   </div>
 
                   <div className="text-sm">
                     <span className="font-medium">Type:</span>{' '}
                     <Badge variant="outline">
-                      {order.order_type === 'pickup' ? 'Pickup' : 'Delivery'}
+                      {order.order_type === 'pickup' || order.order_type === 'qsr' ? 'Pickup/QSR' : 'Delivery'}
                     </Badge>
                   </div>
 
-                  <div className="flex items-center justify-between pt-2">
+                  {order.items && order.items.length > 0 && (
+                    <div className="text-sm text-muted-foreground">
+                      {order.items.slice(0, 2).map((item, idx) => (
+                        <p key={idx}>{item.quantity}x {item.item_name_en}</p>
+                      ))}
+                      {order.items.length > 2 && (
+                        <p className="text-primary">+{order.items.length - 2} more items</p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-2 border-t">
                     <span className="text-lg font-bold">{order.total_amount?.toFixed(3)} KWD</span>
                     <div className="flex gap-2">
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setSelectedOrder(order);
                           setShowReceipt(false);
                         }}
@@ -275,8 +390,11 @@ const AdminOrders = () => {
                       {nextStatus && (
                         <Button
                           size="sm"
-                          onClick={() => updateOrderStatus(order.id, nextStatus)}
-                          className={statusConfig[nextStatus].color}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateOrderStatus(order.id, nextStatus);
+                          }}
+                          className={statusConfig[nextStatus].bgColor}
                         >
                           {statusConfig[nextStatus].label}
                         </Button>
@@ -298,8 +416,8 @@ const AdminOrders = () => {
               <DialogHeader>
                 <DialogTitle className="flex items-center justify-between">
                   <span>Order #{selectedOrder.order_number}</span>
-                  <Badge className={`${statusConfig[selectedOrder.status].color} text-white`}>
-                    {statusConfig[selectedOrder.status].label}
+                  <Badge className={`${statusConfig[selectedOrder.status]?.bgColor || 'bg-gray-500'} text-white`}>
+                    {statusConfig[selectedOrder.status]?.label || selectedOrder.status}
                   </Badge>
                 </DialogTitle>
               </DialogHeader>
@@ -309,8 +427,8 @@ const AdminOrders = () => {
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <h3 className="font-semibold mb-2">Customer Details</h3>
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div><span className="text-muted-foreground">Name:</span> {selectedOrder.customer_name}</div>
-                    <div><span className="text-muted-foreground">Phone:</span> {selectedOrder.customer_phone}</div>
+                    <div><span className="text-muted-foreground">Name:</span> {selectedOrder.customer_name || 'Guest'}</div>
+                    <div><span className="text-muted-foreground">Phone:</span> {selectedOrder.customer_phone || 'N/A'}</div>
                     {selectedOrder.customer_email && (
                       <div className="col-span-2"><span className="text-muted-foreground">Email:</span> {selectedOrder.customer_email}</div>
                     )}
@@ -318,7 +436,7 @@ const AdminOrders = () => {
                 </div>
 
                 {/* Delivery Details */}
-                {selectedOrder.order_type === 'delivery' && (
+                {selectedOrder.order_type === 'delivery' && selectedOrder.delivery_address && (
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <h3 className="font-semibold mb-2">Delivery Address</h3>
                     <p className="text-sm">{formatAddress(selectedOrder.delivery_address)}</p>
@@ -334,17 +452,21 @@ const AdminOrders = () => {
                 <div>
                   <h3 className="font-semibold mb-2">Order Items</h3>
                   <div className="space-y-2">
-                    {selectedOrder.items?.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-start p-3 bg-gray-50 rounded">
-                        <div>
-                          <p className="font-medium">{item.item_name_en}</p>
-                          <p className="text-sm text-muted-foreground">{item.item_name_ar}</p>
-                          <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
-                          {item.notes && <p className="text-sm text-orange-600">Note: {item.notes}</p>}
+                    {selectedOrder.items && selectedOrder.items.length > 0 ? (
+                      selectedOrder.items.map((item, idx) => (
+                        <div key={idx} className="flex justify-between items-start p-3 bg-gray-50 rounded">
+                          <div>
+                            <p className="font-medium">{item.item_name_en}</p>
+                            {item.item_name_ar && <p className="text-sm text-muted-foreground">{item.item_name_ar}</p>}
+                            <p className="text-sm text-muted-foreground">Qty: {item.quantity} × {item.unit_price?.toFixed(3)} KWD</p>
+                            {item.notes && <p className="text-sm text-orange-600">Note: {item.notes}</p>}
+                          </div>
+                          <span className="font-medium">{item.total_price?.toFixed(3)} KWD</span>
                         </div>
-                        <span className="font-medium">{item.total_price?.toFixed(3)} KWD</span>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <p className="text-muted-foreground text-center py-4">No items found</p>
+                    )}
                   </div>
                 </div>
 
@@ -391,7 +513,7 @@ const AdminOrders = () => {
                   {getNextStatus(selectedOrder.status) && (
                     <Button
                       onClick={() => updateOrderStatus(selectedOrder.id, getNextStatus(selectedOrder.status)!)}
-                      className={`flex-1 ${statusConfig[getNextStatus(selectedOrder.status)!].color}`}
+                      className={`flex-1 ${statusConfig[getNextStatus(selectedOrder.status)!].bgColor}`}
                     >
                       Mark as {statusConfig[getNextStatus(selectedOrder.status)!].label}
                     </Button>
@@ -416,7 +538,7 @@ const AdminOrders = () => {
             <Button variant="outline" onClick={() => setShowReceipt(false)} className="flex-1">
               Close
             </Button>
-            <Button onClick={handlePrint} className="flex-1">
+            <Button onClick={() => handlePrint()} className="flex-1">
               <Printer className="h-4 w-4 mr-2" />
               Print
             </Button>
