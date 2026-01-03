@@ -1,23 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Navigation, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-
-// Import Leaflet CSS
-import 'leaflet/dist/leaflet.css';
-
-// Dynamic imports for Leaflet
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
-
-// Fix leaflet default marker icon
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
 
 const KUWAIT_CENTER: [number, number] = [29.3759, 47.9774];
 
@@ -27,21 +12,13 @@ interface CheckoutMapProps {
   isRTL: boolean;
 }
 
-function LocationMarker({ position, onPositionChange }: { 
-  position: [number, number] | null;
-  onPositionChange: (pos: [number, number]) => void;
-}) {
-  useMapEvents({
-    click(e) {
-      onPositionChange([e.latlng.lat, e.latlng.lng]);
-    },
-  });
-  return position ? <Marker position={position} /> : null;
-}
-
 const CheckoutMap: React.FC<CheckoutMapProps> = ({ onPositionChange, onAddressChange, isRTL }) => {
   const [mapPosition, setMapPosition] = useState<[number, number] | null>(null);
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
+  const [isMapReady, setIsMapReady] = useState(false);
+  const mapRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
 
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
     setIsReverseGeocoding(true);
@@ -74,6 +51,68 @@ const CheckoutMap: React.FC<CheckoutMapProps> = ({ onPositionChange, onAddressCh
     reverseGeocode(pos[0], pos[1]);
   }, [onPositionChange, reverseGeocode]);
 
+  // Initialize map using vanilla Leaflet
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return;
+
+    // Dynamically import Leaflet
+    const initMap = async () => {
+      try {
+        const L = await import('leaflet');
+        
+        // Import CSS
+        await import('leaflet/dist/leaflet.css');
+
+        // Fix default marker icons
+        delete (L.Icon.Default.prototype as any)._getIconUrl;
+        L.Icon.Default.mergeOptions({
+          iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+          iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+        });
+
+        // Create map
+        const map = L.map(mapContainerRef.current!, {
+          center: KUWAIT_CENTER,
+          zoom: 12,
+          scrollWheelZoom: true,
+        });
+
+        // Add tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
+
+        // Handle click to add/move marker
+        map.on('click', (e: any) => {
+          const { lat, lng } = e.latlng;
+          
+          if (markerRef.current) {
+            markerRef.current.setLatLng([lat, lng]);
+          } else {
+            markerRef.current = L.marker([lat, lng]).addTo(map);
+          }
+          
+          handleMapPositionChange([lat, lng]);
+        });
+
+        mapRef.current = map;
+        setIsMapReady(true);
+      } catch (error) {
+        console.error('Error initializing map:', error);
+      }
+    };
+
+    initMap();
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, [handleMapPositionChange]);
+
   const handleGetLocation = () => {
     if (!navigator.geolocation) {
       toast.error('Geolocation is not supported');
@@ -82,6 +121,20 @@ const CheckoutMap: React.FC<CheckoutMapProps> = ({ onPositionChange, onAddressCh
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const pos: [number, number] = [position.coords.latitude, position.coords.longitude];
+        
+        if (mapRef.current) {
+          mapRef.current.setView(pos, 15);
+          
+          const L = (window as any).L;
+          if (L) {
+            if (markerRef.current) {
+              markerRef.current.setLatLng(pos);
+            } else {
+              markerRef.current = L.marker(pos).addTo(mapRef.current);
+            }
+          }
+        }
+        
         handleMapPositionChange(pos);
       },
       () => toast.error('Unable to get your location')
@@ -98,19 +151,8 @@ const CheckoutMap: React.FC<CheckoutMapProps> = ({ onPositionChange, onAddressCh
         </Button>
       </div>
       <div className="h-[200px] rounded-lg overflow-hidden border relative">
-        <MapContainer 
-          center={mapPosition || KUWAIT_CENTER} 
-          zoom={12} 
-          style={{ height: '100%', width: '100%' }}
-          scrollWheelZoom={true}
-        >
-          <TileLayer
-            attribution='&copy; OpenStreetMap'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <LocationMarker position={mapPosition} onPositionChange={handleMapPositionChange} />
-        </MapContainer>
-        {isReverseGeocoding && (
+        <div ref={mapContainerRef} style={{ height: '100%', width: '100%' }} />
+        {(!isMapReady || isReverseGeocoding) && (
           <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>
