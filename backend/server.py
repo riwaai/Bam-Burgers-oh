@@ -506,7 +506,7 @@ async def update_order_status(order_id: str, request: UpdateStatusRequest):
 
 @api_router.get("/admin/orders")
 async def get_all_orders(status: Optional[str] = None, limit: int = 50):
-    """Get all orders for admin panel"""
+    """Get all orders for admin panel with local status updates applied"""
     try:
         # Get orders from MongoDB fallback
         mongo_query = {'tenant_id': TENANT_ID}
@@ -530,9 +530,27 @@ async def get_all_orders(status: Optional[str] = None, limit: int = 50):
         
         supabase_orders = await supabase_request('GET', 'orders', params=params)
         
+        # Get all local status updates
+        status_updates = {}
+        async for update in db.order_status_updates.find().sort('timestamp', -1):
+            order_id = update.get('order_id')
+            if order_id and order_id not in status_updates:
+                status_updates[order_id] = update.get('status')
+        
+        # Apply local status updates to Supabase orders
+        if supabase_orders:
+            for order in supabase_orders:
+                order_id = order.get('id')
+                if order_id in status_updates:
+                    order['status'] = status_updates[order_id]
+        
         # Combine and sort by created_at
         all_orders = mongo_orders + (supabase_orders or [])
         all_orders.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        
+        # Filter by status if needed (after applying updates)
+        if status:
+            all_orders = [o for o in all_orders if o.get('status') == status]
         
         return all_orders[:limit]
         
