@@ -382,7 +382,7 @@ const AdminMenu = () => {
                     <div className="flex-1">
                       <h3 className="font-semibold">{item.name_en}</h3>
                       <p className="text-sm text-muted-foreground">{item.name_ar}</p>
-                      <p className="text-primary font-bold mt-1">{item.price.toFixed(3)} KWD</p>
+                      <p className="text-primary font-bold mt-1">{(item.price || 0).toFixed(3)} KWD</p>
                       <div className="flex gap-2 mt-2">
                         <Badge variant="outline">{getCategoryName(item.category_id)}</Badge>
                         <Badge variant={item.status === 'active' ? 'default' : 'secondary'}>
