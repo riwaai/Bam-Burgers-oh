@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useOrder } from "@/contexts/OrderContext";
 import { useCategories, useMenuItems } from "@/hooks/useSupabaseMenu";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 const Menu = () => {
   const { t, isRTL } = useLanguage();
@@ -80,25 +81,28 @@ const Menu = () => {
             </div>
           </div>
 
-          {/* Category Filter */}
-          <div className="mb-10 overflow-x-auto scrollbar-hide">
-            <div className={`flex gap-2 pb-2 min-w-max ${isRTL ? 'flex-row-reverse justify-end' : 'justify-center'}`}>
-              {categories.map((category) => (
-                <Button
-                  key={category.id}
-                  variant={activeCategory === category.id ? "default" : "outline"}
-                  onClick={() => setActiveCategory(category.id)}
-                  className={`rounded-full whitespace-nowrap transition-all ${
-                    activeCategory === category.id 
-                      ? 'shadow-md' 
-                      : 'hover:border-primary hover:text-primary'
-                  }`}
-                  size="sm"
-                >
-                  {isRTL ? category.name_ar : category.name_en}
-                </Button>
-              ))}
-            </div>
+          {/* Category Filter - Horizontal Scrollable for Mobile */}
+          <div className="mb-10">
+            <ScrollArea className="w-full whitespace-nowrap">
+              <div className={`flex gap-2 pb-4 px-1 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                {categories.map((category) => (
+                  <Button
+                    key={category.id}
+                    variant={activeCategory === category.id ? "default" : "outline"}
+                    onClick={() => setActiveCategory(category.id)}
+                    className={`rounded-full whitespace-nowrap transition-all flex-shrink-0 ${
+                      activeCategory === category.id 
+                        ? 'shadow-md' 
+                        : 'hover:border-primary hover:text-primary'
+                    }`}
+                    size="sm"
+                  >
+                    {isRTL ? category.name_ar : category.name_en}
+                  </Button>
+                ))}
+              </div>
+              <ScrollBar orientation="horizontal" className="h-2" />
+            </ScrollArea>
           </div>
 
           {/* Loading State */}
@@ -111,8 +115,7 @@ const Menu = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredItems.map((item) => (
                 <MenuCard key={item.id} item={item} />
-              ))}
-            </div>
+              ))}n            </div>
           ) : (
             <div className="text-center py-16">
               <p className="text-muted-foreground text-lg">{t.menu.noItems}</p>

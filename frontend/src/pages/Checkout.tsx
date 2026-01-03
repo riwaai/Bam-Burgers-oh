@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Truck, MapPin, CreditCard, Banknote, Loader2, Store, Navigation } from "lucide-react";
 import Navbar from "@/components/Navbar";
@@ -16,34 +16,14 @@ import { useOrder } from "@/contexts/OrderContext";
 import { useCustomerAuth } from "@/contexts/CustomerAuthContext";
 import { formatPrice } from "@/hooks/useSupabaseMenu";
 import { toast } from "sonner";
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-
-// Fix leaflet default marker icon
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 const KUWAIT_CENTER: [number, number] = [29.3759, 47.9774];
 
 type PaymentMethod = 'cash' | 'online';
 
-function LocationMarker({ position, onPositionChange }: { 
-  position: [number, number] | null;
-  onPositionChange: (pos: [number, number]) => void;
-}) {
-  useMapEvents({
-    click(e) {
-      onPositionChange([e.latlng.lat, e.latlng.lng]);
-    },
-  });
-  return position ? <Marker position={position} /> : null;
-}
+// Lazy load map component
+const MapSection = lazy(() => import('@/components/CheckoutMap'));
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -56,7 +36,6 @@ const Checkout = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [mapPosition, setMapPosition] = useState<[number, number] | null>(null);
-  const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
   const deliveryFee = isPickup ? 0 : 0.500;
   
   const [formData, setFormData] = useState({
@@ -74,51 +53,15 @@ const Checkout = () => {
     notes: '',
   });
 
-  const reverseGeocode = useCallback(async (lat: number, lng: number) => {
-    setIsReverseGeocoding(true);
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
-        { headers: { 'Accept-Language': 'en' } }
-      );
-      if (!response.ok) throw new Error('Geocoding failed');
-      const data = await response.json();
-      const address = data.address || {};
-      
-      setFormData(prev => ({
-        ...prev,
-        area: address.suburb || address.neighbourhood || address.city_district || address.town || address.city || prev.area,
-        street: address.road || address.street || prev.street,
-        building: address.house_number || prev.building,
-        block: address.quarter || prev.block,
-      }));
-      toast.success(isRTL ? 'تم تحديد العنوان' : 'Address detected from map');
-    } catch (err) {
-      console.error('Reverse geocoding error:', err);
-    } finally {
-      setIsReverseGeocoding(false);
-    }
-  }, [isRTL]);
-
-  const handleMapPositionChange = useCallback((pos: [number, number]) => {
-    setMapPosition(pos);
-    reverseGeocode(pos[0], pos[1]);
-  }, [reverseGeocode]);
-
-  const handleGetLocation = () => {
-    if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported');
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const pos: [number, number] = [position.coords.latitude, position.coords.longitude];
-        setMapPosition(pos);
-        reverseGeocode(pos[0], pos[1]);
-      },
-      () => toast.error('Unable to get your location')
-    );
-  };
+  const handleAddressFromMap = useCallback((address: { area: string; street: string; block: string; building: string }) => {
+    setFormData(prev => ({
+      ...prev,
+      area: address.area || prev.area,
+      street: address.street || prev.street,
+      block: address.block || prev.block,
+      building: address.building || prev.building,
+    }));
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -206,7 +149,7 @@ const Checkout = () => {
       navigate(`/track-order/${orderResult.id}?order_number=${orderResult.order_number}`);
     } catch (error) {
       console.error('Order error:', error);
-      toast.error(t.errors.orderFailed);
+      toast.error(isRTL ? 'حدث خطأ' : 'An error occurred');
     } finally {
       setIsProcessing(false);
     }
@@ -313,29 +256,19 @@ const Checkout = () => {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label>{isRTL ? 'حدد موقعك على الخريطة' : 'Pin your location on the map'}</Label>
-                          <Button type="button" variant="outline" size="sm" onClick={handleGetLocation}>
-                            <Navigation className="h-4 w-4 mr-2" />
-                            {isRTL ? 'موقعي الحالي' : 'Use my location'}
-                          </Button>
+                      {/* Map Section - Lazy Loaded */}
+                      <Suspense fallback={
+                        <div className="h-[200px] bg-gray-100 rounded-lg flex items-center justify-center">
+                          <Loader2 className="h-6 w-6 animate-spin text-primary" />
                         </div>
-                        <div className="h-[200px] rounded-lg overflow-hidden border relative">
-                          <MapContainer center={mapPosition || KUWAIT_CENTER} zoom={12} style={{ height: '100%', width: '100%' }}>
-                            <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                            <LocationMarker position={mapPosition} onPositionChange={handleMapPositionChange} />
-                          </MapContainer>
-                          {isReverseGeocoding && (
-                            <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
-                              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                            </div>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {isRTL ? 'انقر على الخريطة لتحديد موقعك' : 'Click on the map to pin your location'}
-                        </p>
-                      </div>
+                      }>
+                        <MapSection 
+                          onPositionChange={setMapPosition}
+                          onAddressChange={handleAddressFromMap}
+                          isRTL={isRTL}
+                        />
+                      </Suspense>
+
                       <Separator />
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
