@@ -30,10 +30,11 @@ const Checkout = () => {
   const navigate = useNavigate();
   const { items, subtotal, total, discount, clearCart } = useCart();
   const { t, isRTL } = useLanguage();
-  const { orderType, deliveryAddress, selectedBranch } = useOrder();
+  const { orderType, deliveryAddress, selectedBranch, setOrderType } = useOrder();
   const { customer } = useCustomerAuth();
 
-  const isPickup = orderType === 'pickup';
+  const [localOrderType, setLocalOrderType] = useState(orderType || 'delivery');
+  const isPickup = localOrderType === 'pickup';
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [mapPosition, setMapPosition] = useState<[number, number] | null>(null);
