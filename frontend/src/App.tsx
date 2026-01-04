@@ -60,6 +60,7 @@ const App = () => (
                 <Sonner position="top-center" />
                 <BrowserRouter>
                   <ScrollToTop />
+                  <CartFooter />
                   <Routes>
                     {/* Customer Routes */}
                     <Route path="/" element={<Index />} />
