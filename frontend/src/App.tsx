@@ -14,6 +14,7 @@ import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 
 // Components
 import ScrollToTop from "@/components/ScrollToTop";
+import CartFooter from "@/components/CartFooter";
 
 // Customer Pages
 import Index from "./pages/Index";
