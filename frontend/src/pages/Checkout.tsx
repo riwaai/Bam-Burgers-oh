@@ -125,7 +125,7 @@ const Checkout = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          order_type: isPickup ? 'pickup' : 'delivery',
+          order_type: localOrderType,
           customer_name: `${formData.firstName} ${formData.lastName}`.trim(),
           customer_phone: formData.phone,
           customer_email: formData.email || undefined,
