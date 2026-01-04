@@ -152,32 +152,30 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   // Calculate item count
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
-  // Apply coupon (will be connected to Supabase later)
+  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
+
+  // Apply coupon via backend API
   const applyCoupon = async (code: string): Promise<boolean> => {
-    // Mock coupon validation - will be replaced with Supabase query
-    const mockCoupons: Record<string, { type: 'percentage' | 'fixed'; value: number }> = {
-      'SAVE10': { type: 'percentage', value: 10 },
-      'SAVE20': { type: 'percentage', value: 20 },
-      'FIRST50': { type: 'percentage', value: 50 },
-      'FREE1': { type: 'fixed', value: 1 },
-    };
-
-    const upperCode = code.toUpperCase();
-    const coupon = mockCoupons[upperCode];
-
-    if (coupon) {
-      setAppliedCoupon(upperCode);
-      if (coupon.type === 'percentage') {
-        setDiscount((subtotal * coupon.value) / 100);
-      } else {
-        setDiscount(coupon.value);
+    try {
+      const response = await fetch(
+        `${BACKEND_URL}/api/coupons/validate?code=${encodeURIComponent(code)}&subtotal=${subtotal}`
+      , { method: 'POST' });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        toast.error(error.detail || "Invalid coupon code");
+        return false;
       }
-      toast.success(`Coupon applied! ${coupon.type === 'percentage' ? `${coupon.value}%` : `${coupon.value.toFixed(3)} KWD`} off`);
+      
+      const result = await response.json();
+      setAppliedCoupon(result.code);
+      setDiscount(result.discount_amount);
+      toast.success(`Coupon applied! ${result.description || `${result.discount_amount.toFixed(3)} KWD off`}`);
       return true;
+    } catch (error) {
+      toast.error("Invalid coupon code");
+      return false;
     }
-
-    toast.error("Invalid coupon code");
-    return false;
   };
 
   const removeCoupon = () => {
@@ -188,23 +186,18 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
   // Recalculate discount when subtotal changes
   useEffect(() => {
-    if (appliedCoupon) {
+    if (appliedCoupon && subtotal > 0) {
       // Re-validate coupon when subtotal changes
-      const mockCoupons: Record<string, { type: 'percentage' | 'fixed'; value: number }> = {
-        'SAVE10': { type: 'percentage', value: 10 },
-        'SAVE20': { type: 'percentage', value: 20 },
-        'FIRST50': { type: 'percentage', value: 50 },
-        'FREE1': { type: 'fixed', value: 1 },
-      };
-
-      const coupon = mockCoupons[appliedCoupon];
-      if (coupon) {
-        if (coupon.type === 'percentage') {
-          setDiscount((subtotal * coupon.value) / 100);
-        } else {
-          setDiscount(Math.min(coupon.value, subtotal));
-        }
-      }
+      fetch(
+        `${BACKEND_URL}/api/coupons/validate?code=${encodeURIComponent(appliedCoupon)}&subtotal=${subtotal}`
+      , { method: 'POST' })
+        .then(res => res.ok ? res.json() : null)
+        .then(result => {
+          if (result) {
+            setDiscount(result.discount_amount);
+          }
+        })
+        .catch(() => {});
     }
   }, [subtotal, appliedCoupon]);
 
