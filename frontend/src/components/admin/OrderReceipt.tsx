@@ -20,6 +20,20 @@ interface OrderReceiptProps {
   };
 }
 
+// Format date in Kuwait time (UTC+3)
+const formatKuwaitDate = (dateStr: string) => {
+  const date = new Date(dateStr);
+  return date.toLocaleString('en-GB', {
+    timeZone: 'Asia/Kuwait',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+};
+
 const OrderReceipt: React.FC<OrderReceiptProps> = ({ order }) => {
   const formatAddress = (address: any) => {
     if (!address) return '';
@@ -34,32 +48,19 @@ const OrderReceipt: React.FC<OrderReceiptProps> = ({ order }) => {
     return parts.join(', ');
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    });
-  };
-
-  // Calculate total items count
   const totalItems = order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
 
   return (
     <div className="bg-white p-6 text-black text-sm" style={{ width: '320px', fontFamily: 'monospace' }}>
-      {/* Header with Logo - Matching the sample */}
+      {/* Header with Logo */}
       <div className="text-center border-b-2 border-black pb-4 mb-4">
         <img src={LOGO_URL} alt="Bam" className="h-16 mx-auto mb-2" />
         <p className="font-bold text-lg">{RESTAURANT_NAME}</p>
         <p className="text-xs">Salwa</p>
-        <p className="text-xs">{formatDate(order.created_at)}</p>
+        <p className="text-xs">{formatKuwaitDate(order.created_at)}</p>
       </div>
 
-      {/* Bill Info - Matching the sample "Quick Bill" format */}
+      {/* Bill Info */}
       <div className="text-center border-b border-dashed border-gray-400 pb-3 mb-3">
         <p className="font-bold">Quick Bill</p>
         <p className="font-bold text-xl">Bill No:{order.order_number.split('-').pop()}</p>
@@ -118,7 +119,7 @@ const OrderReceipt: React.FC<OrderReceiptProps> = ({ order }) => {
         </div>
       </div>
 
-      {/* Grand Total - Matching the sample */}
+      {/* Grand Total */}
       <div className="text-center py-4 bg-gray-100 -mx-6 px-6 mb-4">
         <p className="font-bold text-lg">Grand Total</p>
         <p className="text-right font-bold" dir="rtl">المجموع الإجمالي</p>
@@ -151,7 +152,7 @@ const OrderReceipt: React.FC<OrderReceiptProps> = ({ order }) => {
         </div>
       )}
 
-      {/* Footer - Matching the sample */}
+      {/* Footer */}
       <div className="text-center text-xs mt-4 pt-4 border-t border-gray-300">
         <p className="mb-2">--------------------------------</p>
         <p className="font-bold">Thank you for choosing</p>

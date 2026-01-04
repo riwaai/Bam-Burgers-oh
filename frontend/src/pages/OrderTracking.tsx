@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
-import { Check, Clock, ChefHat, Package, Truck, Home, Phone, Loader2, Download, X } from "lucide-react";
+import { Check, Clock, ChefHat, Package, Truck, Home, Phone, Loader2, Download, X, Printer } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,6 @@ import { toast } from "sonner";
 
 type OrderStatus = 'pending' | 'accepted' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'completed' | 'cancelled';
 
-// Map backend status to display status
 const statusMapping: Record<string, OrderStatus> = {
   'pending': 'pending',
   'accepted': 'accepted',
@@ -27,6 +26,18 @@ const statusMapping: Record<string, OrderStatus> = {
   'cancelled': 'cancelled',
 };
 
+// Timer-based automatic status updates (in milliseconds)
+const STATUS_TIMERS: Record<OrderStatus, { next: OrderStatus | null; delay: number }> = {
+  'pending': { next: 'accepted', delay: 40 * 1000 }, // 40 seconds
+  'accepted': { next: 'preparing', delay: 60 * 1000 }, // 1 minute
+  'preparing': { next: 'ready', delay: 12 * 60 * 1000 }, // 12 minutes
+  'ready': { next: 'out_for_delivery', delay: 2 * 60 * 1000 }, // 2 minutes
+  'out_for_delivery': { next: 'delivered', delay: 20 * 60 * 1000 }, // 20 minutes
+  'delivered': { next: null, delay: 0 },
+  'completed': { next: null, delay: 0 },
+  'cancelled': { next: null, delay: 0 },
+};
+
 const OrderTracking = () => {
   const { orderId } = useParams();
   const [searchParams] = useSearchParams();
@@ -34,20 +45,71 @@ const OrderTracking = () => {
   const { t, isRTL } = useLanguage();
   const [showReceipt, setShowReceipt] = useState(false);
   const [orderItems, setOrderItems] = useState<any[]>([]);
+  const [displayStatus, setDisplayStatus] = useState<OrderStatus>('pending');
   const receiptRef = useRef<HTMLDivElement>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const statusStartTimeRef = useRef<number>(Date.now());
 
-  // Try to get order by ID first, then by order number
   const { order: orderById, loading: loadingById } = useOrderTracking(orderId);
   const { order: orderByNum, loading: loadingByNum } = useOrderByNumber(orderNumber || undefined);
 
   const order = orderById || orderByNum;
   const loading = loadingById || loadingByNum;
-  const status = order ? (statusMapping[order.status] || 'pending') : 'pending';
+  const backendStatus = order ? (statusMapping[order.status] || 'pending') : 'pending';
 
-  // Fetch order items when order is loaded
+  // Timer-based status progression
+  useEffect(() => {
+    if (!order) return;
+
+    // Initialize display status from order
+    const initialStatus = statusMapping[order.status] || 'pending';
+    setDisplayStatus(initialStatus);
+    statusStartTimeRef.current = Date.now();
+
+    // Clear existing timer
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+
+    // Set up automatic progression
+    const progressStatus = () => {
+      setDisplayStatus(current => {
+        const config = STATUS_TIMERS[current];
+        if (config.next && current !== 'cancelled') {
+          // Schedule next transition
+          const nextConfig = STATUS_TIMERS[config.next];
+          if (nextConfig.next) {
+            timerRef.current = setTimeout(progressStatus, nextConfig.delay);
+          }
+          return config.next;
+        }
+        return current;
+      });
+    };
+
+    // Start timer for current status
+    const config = STATUS_TIMERS[initialStatus];
+    if (config.next && initialStatus !== 'cancelled') {
+      timerRef.current = setTimeout(progressStatus, config.delay);
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, [order?.id, order?.status]);
+
+  // Fetch order items
   useEffect(() => {
     const fetchItems = async () => {
       if (!order?.id) return;
+      
+      // Check if items are already in order (from MongoDB)
+      if (order.items && order.items.length > 0) {
+        setOrderItems(order.items);
+        return;
+      }
       
       const { data, error } = await supabase
         .from('order_items')
@@ -62,8 +124,6 @@ const OrderTracking = () => {
     fetchItems();
   }, [order?.id]);
 
-  // Order status flow as per user request:
-  // order placed -> order accepted -> freshly preparing -> ready for delivery -> out for delivery -> delivered
   const steps = [
     { id: 'pending', label: isRTL ? 'تم استلام الطلب' : 'Order Placed', icon: Check },
     { id: 'accepted', label: isRTL ? 'تم قبول الطلب' : 'Order Accepted', icon: Check },
@@ -73,16 +133,15 @@ const OrderTracking = () => {
     { id: 'delivered', label: isRTL ? 'تم التوصيل' : 'Delivered', icon: Home },
   ];
 
-  const currentStepIndex = steps.findIndex(s => s.id === status);
+  const currentStepIndex = steps.findIndex(s => s.id === displayStatus);
 
   const getStepStatus = (index: number) => {
-    if (status === 'cancelled') return 'cancelled';
+    if (displayStatus === 'cancelled') return 'cancelled';
     if (index < currentStepIndex) return 'completed';
     if (index === currentStepIndex) return 'current';
     return 'upcoming';
   };
 
-  // Download receipt as PNG
   const handleDownloadReceipt = async () => {
     if (!receiptRef.current) return;
     
@@ -135,7 +194,6 @@ const OrderTracking = () => {
     );
   }
 
-  // Prepare order with items for receipt
   const orderWithItems = order ? { ...order, items: orderItems } : null;
 
   return (
@@ -148,7 +206,6 @@ const OrderTracking = () => {
             <span className="text-primary">{t.orderTracking.title}</span>
           </h1>
 
-          {/* Order Number */}
           {order && (
             <div className={`flex items-center justify-between mb-8 ${isRTL ? 'flex-row-reverse' : ''}`}>
               <p className={`text-muted-foreground ${isRTL ? 'text-right' : ''}`}>
@@ -162,8 +219,7 @@ const OrderTracking = () => {
             </div>
           )}
 
-          {/* Cancelled Status */}
-          {status === 'cancelled' && (
+          {displayStatus === 'cancelled' && (
             <Card className="mb-6 border-red-200 bg-red-50">
               <CardContent className="p-6">
                 <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
@@ -183,8 +239,7 @@ const OrderTracking = () => {
             </Card>
           )}
 
-          {/* Status Timeline - Only show if not cancelled */}
-          {status !== 'cancelled' && (
+          {displayStatus !== 'cancelled' && (
             <Card className="mb-6">
               <CardHeader>
                 <CardTitle className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
@@ -200,7 +255,6 @@ const OrderTracking = () => {
                     
                     return (
                       <div key={step.id} className={`flex items-start gap-4 ${index < steps.length - 1 ? 'pb-8' : ''} ${isRTL ? 'flex-row-reverse' : ''}`}>
-                        {/* Icon */}
                         <div className={`relative z-10 flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-500 ${
                           stepStatus === 'completed' ? 'bg-green-500 text-white' :
                           stepStatus === 'current' ? 'bg-primary text-white animate-pulse' :
@@ -213,14 +267,12 @@ const OrderTracking = () => {
                           )}
                         </div>
                         
-                        {/* Line */}
                         {index < steps.length - 1 && (
                           <div className={`absolute ${isRTL ? 'right-5' : 'left-5'} top-10 w-0.5 h-8 transition-all duration-500 ${
                             stepStatus === 'completed' ? 'bg-green-500' : 'bg-muted'
                           }`} />
                         )}
                         
-                        {/* Label */}
                         <div className={`flex-1 pt-2 ${isRTL ? 'text-right' : ''}`}>
                           <p className={`font-medium ${
                             stepStatus === 'completed' ? 'text-green-600' :
@@ -243,7 +295,6 @@ const OrderTracking = () => {
             </Card>
           )}
 
-          {/* Order Summary */}
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>{isRTL ? 'ملخص الطلب' : 'Order Summary'}</CardTitle>
@@ -272,8 +323,7 @@ const OrderTracking = () => {
             </CardContent>
           </Card>
 
-          {/* Estimated Time */}
-          {status !== 'cancelled' && status !== 'delivered' && (
+          {displayStatus !== 'cancelled' && displayStatus !== 'delivered' && (
             <Card className="mb-6">
               <CardContent className="p-6">
                 <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
@@ -291,7 +341,6 @@ const OrderTracking = () => {
             </Card>
           )}
 
-          {/* Contact */}
           <Card>
             <CardContent className="p-6">
               <div className={`flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
@@ -314,7 +363,6 @@ const OrderTracking = () => {
             </CardContent>
           </Card>
 
-          {/* Back to Menu */}
           <div className="mt-8 text-center">
             <Link to="/menu">
               <Button variant="outline">
@@ -327,23 +375,27 @@ const OrderTracking = () => {
 
       <Footer />
 
-      {/* Receipt Modal */}
+      {/* Receipt Modal - Scrollable with buttons at top */}
       <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{isRTL ? 'إيصال الطلب' : 'Order Receipt'}</DialogTitle>
           </DialogHeader>
-          <div ref={receiptRef} className="bg-white">
-            {orderWithItems && <OrderReceipt order={orderWithItems} />}
-          </div>
-          <div className="flex gap-3 mt-4">
+          {/* Buttons at top */}
+          <div className="flex gap-3 pb-4 border-b">
             <Button variant="outline" onClick={() => setShowReceipt(false)} className="flex-1">
               {isRTL ? 'إغلاق' : 'Close'}
             </Button>
             <Button onClick={handleDownloadReceipt} className="flex-1">
               <Download className="h-4 w-4 mr-2" />
-              {isRTL ? 'تحميل PNG' : 'Download PNG'}
+              {isRTL ? 'تحميل' : 'Download'}
             </Button>
+          </div>
+          {/* Scrollable receipt content */}
+          <div className="overflow-y-auto flex-1">
+            <div ref={receiptRef} className="bg-white">
+              {orderWithItems && <OrderReceipt order={orderWithItems} />}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

@@ -7,7 +7,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { supabase, TENANT_ID } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import OrderReceipt from '@/components/admin/OrderReceipt';
-import html2canvas from 'html2canvas';
 
 type OrderStatus = 'pending' | 'accepted' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'completed' | 'cancelled';
 
@@ -41,6 +40,8 @@ interface Order {
   items?: OrderItem[];
 }
 
+// Admin flow: Pending -> Accepted -> Ready
+const adminStatusFlow: OrderStatus[] = ['pending', 'accepted', 'ready'];
 const statusFlow: OrderStatus[] = ['pending', 'accepted', 'preparing', 'ready', 'out_for_delivery', 'delivered'];
 
 const statusConfig: Record<OrderStatus, { label: string; bgColor: string }> = {
@@ -69,7 +70,6 @@ const AdminOrders = () => {
   const receiptRef = useRef<HTMLDivElement>(null);
   const lastPendingCountRef = useRef(0);
 
-  // Create beep sound using Web Audio API
   const playBeep = () => {
     try {
       if (!audioContextRef.current) {
@@ -128,14 +128,16 @@ const AdminOrders = () => {
 
   const fetchOrders = async () => {
     try {
-      // Fetch from backend API which applies local status updates
       const response = await fetch(`${BACKEND_URL}/api/admin/orders?limit=100`);
       if (!response.ok) throw new Error('Failed to fetch');
       const ordersData = await response.json();
       
-      // Fetch items for each order
       const ordersWithItems = await Promise.all(
         (ordersData || []).map(async (order: any) => {
+          // Check if items are already in order (from MongoDB)
+          if (order.items && order.items.length > 0) {
+            return order;
+          }
           const { data: items } = await supabase.from('order_items').select('*').eq('order_id', order.id);
           return { ...order, items: items || [] };
         })
@@ -143,7 +145,6 @@ const AdminOrders = () => {
       setOrders(ordersWithItems);
     } catch (err) {
       console.error('Error fetching orders:', err);
-      // Fallback to direct Supabase fetch
       try {
         const { data, error } = await supabase
           .from('orders')
@@ -187,9 +188,9 @@ const AdminOrders = () => {
     }
   };
 
-  const getNextStatus = (current: OrderStatus): OrderStatus | null => {
-    const idx = statusFlow.indexOf(current);
-    return idx >= 0 && idx < statusFlow.length - 1 ? statusFlow[idx + 1] : null;
+  const getNextAdminStatus = (current: OrderStatus): OrderStatus | null => {
+    const idx = adminStatusFlow.indexOf(current);
+    return idx >= 0 && idx < adminStatusFlow.length - 1 ? adminStatusFlow[idx + 1] : null;
   };
 
   const formatAddress = (addr: any) => {
@@ -197,20 +198,49 @@ const AdminOrders = () => {
     return [addr.area, addr.block && `Block ${addr.block}`, addr.street, addr.building && `Bldg ${addr.building}`, addr.floor && `Floor ${addr.floor}`, addr.apartment && `Apt ${addr.apartment}`].filter(Boolean).join(', ') || 'N/A';
   };
 
-  const formatDate = (d: string) => new Date(d).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const formatDate = (d: string) => {
+    const date = new Date(d);
+    return date.toLocaleString('en-GB', {
+      timeZone: 'Asia/Kuwait',
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
-  const handlePrintReceipt = async () => {
-    if (!receiptRef.current) return;
-    try {
-      const canvas = await html2canvas(receiptRef.current, { scale: 2, backgroundColor: '#fff' });
-      const link = document.createElement('a');
-      link.download = `receipt-${selectedOrder?.order_number}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-      toast.success('Receipt downloaded!');
-    } catch (err) {
-      toast.error('Failed to download');
+  const handlePrintReceipt = () => {
+    const printContent = receiptRef.current;
+    if (!printContent) return;
+    
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('Please allow popups to print');
+      return;
     }
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Receipt - ${selectedOrder?.order_number}</title>
+          <style>
+            body { font-family: monospace; margin: 0; padding: 20px; }
+            @media print {
+              body { padding: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          ${printContent.innerHTML}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.onload = () => {
+      printWindow.print();
+      printWindow.close();
+    };
   };
 
   const filteredOrders = statusFilter === 'all' ? orders : orders.filter(o => o.status === statusFilter);
@@ -233,7 +263,7 @@ const AdminOrders = () => {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {['all', 'pending', 'accepted', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled'].map((s) => (
+        {['all', 'pending', 'accepted', 'ready', 'delivered', 'cancelled'].map((s) => (
           <Button key={s} variant={statusFilter === s ? 'default' : 'outline'} size="sm" onClick={() => setStatusFilter(s)}>
             {s === 'all' ? 'All' : statusConfig[s as OrderStatus]?.label}
             {s === 'pending' && pendingCount > 0 && <Badge className="ml-2 bg-yellow-500">{pendingCount}</Badge>}
@@ -258,7 +288,7 @@ const AdminOrders = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredOrders.map((order) => {
             const cfg = statusConfig[order.status] || statusConfig.pending;
-            const next = getNextStatus(order.status);
+            const next = getNextAdminStatus(order.status);
             const isUpdating = updatingStatus === order.id;
             return (
               <Card key={order.id} className={`hover:shadow-lg transition-all ${order.status === 'pending' ? 'ring-2 ring-yellow-500 animate-pulse' : ''}`}>
@@ -285,11 +315,14 @@ const AdminOrders = () => {
                     <span className="text-lg font-bold">{(order.total_amount || 0).toFixed(3)} KWD</span>
                     <Button size="sm" variant="outline" onClick={() => { setSelectedOrder(order); setShowReceipt(false); }}><Eye className="h-4 w-4" /></Button>
                   </div>
-                  {order.status !== 'cancelled' && order.status !== 'delivered' && order.status !== 'completed' && (
+                  {order.status !== 'cancelled' && order.status !== 'delivered' && order.status !== 'completed' && order.status !== 'ready' && (
                     <div className="flex gap-2 pt-2">
                       {next && <Button size="sm" onClick={() => updateOrderStatus(order.id, next)} className={`flex-1 ${statusConfig[next].bgColor}`} disabled={isUpdating}>{isUpdating ? '...' : statusConfig[next].label}</Button>}
                       <Button size="sm" variant="destructive" onClick={() => { if (confirm('Reject this order?')) updateOrderStatus(order.id, 'cancelled'); }} disabled={isUpdating}><Ban className="h-4 w-4" /></Button>
                     </div>
+                  )}
+                  {order.status === 'ready' && (
+                    <div className="text-center text-green-600 font-medium py-2">✓ Order Ready</div>
                   )}
                 </CardContent>
               </Card>
@@ -331,13 +364,13 @@ const AdminOrders = () => {
                 <div className="border-t pt-4">
                   <div className="flex justify-between font-bold text-lg"><span>Total</span><span>{(selectedOrder.total_amount || 0).toFixed(3)} KWD</span></div>
                 </div>
-                {selectedOrder.status !== 'cancelled' && selectedOrder.status !== 'delivered' && selectedOrder.status !== 'completed' && (
+                {selectedOrder.status !== 'cancelled' && selectedOrder.status !== 'delivered' && selectedOrder.status !== 'completed' && selectedOrder.status !== 'ready' && (
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <h3 className="font-semibold mb-2">Update Status</h3>
                     <div className="flex flex-wrap gap-2">
-                      {statusFlow.map((s) => {
-                        const idx = statusFlow.indexOf(selectedOrder.status);
-                        const sIdx = statusFlow.indexOf(s);
+                      {adminStatusFlow.map((s) => {
+                        const idx = adminStatusFlow.indexOf(selectedOrder.status);
+                        const sIdx = adminStatusFlow.indexOf(s);
                         return (
                           <Button key={s} size="sm" variant={s === selectedOrder.status ? 'default' : sIdx === idx + 1 ? 'default' : 'outline'} className={sIdx === idx + 1 ? statusConfig[s].bgColor : ''} disabled={sIdx <= idx || updatingStatus === selectedOrder.id} onClick={() => updateOrderStatus(selectedOrder.id, s)}>
                             {statusConfig[s].label}
@@ -355,13 +388,18 @@ const AdminOrders = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Receipt Dialog - Scrollable with print button at top */}
       <Dialog open={showReceipt} onOpenChange={() => setShowReceipt(false)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] flex flex-col">
           <DialogHeader><DialogTitle>Receipt</DialogTitle></DialogHeader>
-          <div ref={receiptRef} className="bg-white">{selectedOrder && <OrderReceipt order={selectedOrder} />}</div>
-          <div className="flex gap-3 mt-4">
+          {/* Buttons at top */}
+          <div className="flex gap-3 pb-4 border-b">
             <Button variant="outline" onClick={() => setShowReceipt(false)} className="flex-1">Close</Button>
-            <Button onClick={handlePrintReceipt} className="flex-1"><Printer className="h-4 w-4 mr-2" />Download PNG</Button>
+            <Button onClick={handlePrintReceipt} className="flex-1"><Printer className="h-4 w-4 mr-2" />Print Receipt</Button>
+          </div>
+          {/* Scrollable receipt */}
+          <div className="overflow-y-auto flex-1">
+            <div ref={receiptRef} className="bg-white">{selectedOrder && <OrderReceipt order={selectedOrder} />}</div>
           </div>
         </DialogContent>
       </Dialog>
