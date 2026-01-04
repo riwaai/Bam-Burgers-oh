@@ -181,8 +181,10 @@ export function useAdminOrders(status?: string) {
 // Function to update order status
 export async function updateOrderStatus(orderId: string, status: OrderStatus): Promise<boolean> {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/orders/${orderId}/status?status=${status}`, {
+    const response = await fetch(`${BACKEND_URL}/api/orders/${orderId}/status`, {
       method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
     });
     
     if (!response.ok) {
