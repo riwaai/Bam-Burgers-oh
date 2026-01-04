@@ -16,6 +16,7 @@ import { useOrder } from "@/contexts/OrderContext";
 import { useCustomerAuth } from "@/contexts/CustomerAuthContext";
 import { formatPrice } from "@/hooks/useSupabaseMenu";
 import { toast } from "sonner";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 const KUWAIT_CENTER: [number, number] = [29.3759, 47.9774];
