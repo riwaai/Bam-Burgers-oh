@@ -718,6 +718,79 @@ async def get_menu_items(category_id: Optional[str] = None):
         return []
 
 
+# ==================== LOYALTY SETTINGS ====================
+
+class LoyaltySettings(BaseModel):
+    points_per_kwd: int = 10
+    kwd_per_point: float = 0.01
+    min_points_redeem: int = 100
+    signup_bonus: int = 50
+    referral_bonus: int = 100
+    birthday_bonus: int = 200
+    is_active: bool = True
+
+
+@api_router.get("/loyalty/settings")
+async def get_loyalty_settings():
+    """Get loyalty program settings"""
+    try:
+        # Try MongoDB first
+        settings = await db.loyalty_settings.find_one({'tenant_id': TENANT_ID})
+        if settings:
+            del settings['_id']
+            return settings
+        
+        # Try Supabase
+        try:
+            result = await supabase_request(
+                'GET',
+                'loyalty_settings',
+                params={'tenant_id': f'eq.{TENANT_ID}', 'select': '*'}
+            )
+            if result and len(result) > 0:
+                return result[0]
+        except:
+            pass
+        
+        # Return defaults
+        return {
+            'tenant_id': TENANT_ID,
+            'points_per_kwd': 10,
+            'kwd_per_point': 0.01,
+            'min_points_redeem': 100,
+            'signup_bonus': 50,
+            'referral_bonus': 100,
+            'birthday_bonus': 200,
+            'is_active': True
+        }
+    except Exception as e:
+        logging.error(f"Error getting loyalty settings: {str(e)}")
+        return {'is_active': False}
+
+
+@api_router.post("/loyalty/settings")
+async def save_loyalty_settings(settings: LoyaltySettings):
+    """Save loyalty program settings"""
+    try:
+        settings_doc = {
+            'tenant_id': TENANT_ID,
+            **settings.dict(),
+            'updated_at': datetime.utcnow().isoformat()
+        }
+        
+        # Save to MongoDB
+        await db.loyalty_settings.update_one(
+            {'tenant_id': TENANT_ID},
+            {'$set': settings_doc},
+            upsert=True
+        )
+        
+        return {"success": True, "message": "Settings saved"}
+    except Exception as e:
+        logging.error(f"Error saving loyalty settings: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
