@@ -197,29 +197,43 @@ const Checkout = () => {
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2 space-y-6">
-                {/* Order Type */}
+                {/* Order Type Selector */}
                 <Card>
                   <CardHeader>
                     <CardTitle className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                      {isPickup ? <Store className="h-5 w-5" /> : <Truck className="h-5 w-5" />}
-                      {isPickup ? (isRTL ? 'استلام من الفرع' : 'Pickup') : (isRTL ? 'توصيل' : 'Delivery')}
+                      {isRTL ? 'نوع الطلب' : 'Order Type'}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {isPickup ? (
-                      <div className={`flex items-start gap-3 p-4 bg-primary/5 rounded-lg ${isRTL ? 'flex-row-reverse text-right' : ''}`}>
-                        <MapPin className="h-6 w-6 text-primary mt-1" />
-                        <div>
-                          <p className="font-medium mb-1">{isRTL ? selectedBranch?.name_ar : selectedBranch?.name}</p>
-                          <p className="text-sm text-muted-foreground">{isRTL ? selectedBranch?.address_ar : selectedBranch?.address}</p>
+                    <Tabs value={localOrderType} onValueChange={(v) => setLocalOrderType(v as 'delivery' | 'pickup')} className="w-full">
+                      <TabsList className="w-full grid grid-cols-2">
+                        <TabsTrigger value="delivery" className="flex items-center gap-2">
+                          <Truck className="h-4 w-4" />
+                          {isRTL ? 'توصيل' : 'Delivery'}
+                        </TabsTrigger>
+                        <TabsTrigger value="pickup" className="flex items-center gap-2">
+                          <Store className="h-4 w-4" />
+                          {isRTL ? 'استلام' : 'Pickup'}
+                        </TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                    
+                    <div className="mt-4">
+                      {isPickup ? (
+                        <div className={`flex items-start gap-3 p-4 bg-primary/5 rounded-lg ${isRTL ? 'flex-row-reverse text-right' : ''}`}>
+                          <MapPin className="h-6 w-6 text-primary mt-1" />
+                          <div>
+                            <p className="font-medium mb-1">{isRTL ? 'فرع سلوى' : 'Salwa Branch'}</p>
+                            <p className="text-sm text-muted-foreground">{isRTL ? 'سلوى، الكويت' : 'Salwa, Kuwait'}</p>
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className={`flex items-center gap-3 p-4 bg-primary/5 rounded-lg ${isRTL ? 'flex-row-reverse' : ''}`}>
-                        <Truck className="h-6 w-6 text-primary" />
-                        <p className="font-medium">{isRTL ? 'سنوصل طلبك إلى باب منزلك' : "We'll deliver to your doorstep"}</p>
-                      </div>
-                    )}
+                      ) : (
+                        <div className={`flex items-center gap-3 p-4 bg-primary/5 rounded-lg ${isRTL ? 'flex-row-reverse' : ''}`}>
+                          <Truck className="h-6 w-6 text-primary" />
+                          <p className="font-medium">{isRTL ? 'سنوصل طلبك إلى باب منزلك' : "We'll deliver to your doorstep"}</p>
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
 
