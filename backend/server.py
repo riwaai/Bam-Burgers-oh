@@ -675,6 +675,121 @@ async def validate_coupon(code: str, subtotal: float):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ==================== ADMIN COUPONS ====================
+
+class CouponCreate(BaseModel):
+    code: str
+    description: Optional[str] = ""
+    discount_type: str = "percentage"  # percentage or fixed
+    discount_value: float
+    min_order_amount: float = 0
+    max_discount_amount: Optional[float] = None
+    max_uses: Optional[int] = None
+    status: str = "active"
+
+
+@api_router.get("/admin/coupons")
+async def get_coupons():
+    """Get all coupons for admin"""
+    try:
+        # First try MongoDB
+        mongo_coupons = await db.coupons.find({'tenant_id': TENANT_ID}).to_list(100)
+        for c in mongo_coupons:
+            del c['_id']
+        
+        # Then try Supabase
+        try:
+            supabase_coupons = await supabase_request(
+                'GET', 'coupons',
+                params={'tenant_id': f'eq.{TENANT_ID}', 'select': '*', 'order': 'created_at.desc'}
+            )
+        except:
+            supabase_coupons = []
+        
+        # Combine and dedupe by code
+        all_coupons = {c['code']: c for c in (supabase_coupons or [])}
+        for c in mongo_coupons:
+            all_coupons[c['code']] = c
+        
+        return list(all_coupons.values())
+    except Exception as e:
+        logging.error(f"Error getting coupons: {str(e)}")
+        return []
+
+
+@api_router.post("/admin/coupons")
+async def create_coupon(coupon: CouponCreate):
+    """Create a new coupon"""
+    try:
+        coupon_doc = {
+            'id': str(uuid.uuid4()),
+            'tenant_id': TENANT_ID,
+            'code': coupon.code.upper(),
+            'description': coupon.description,
+            'discount_type': coupon.discount_type,
+            'discount_value': coupon.discount_value,
+            'min_order_amount': coupon.min_order_amount,
+            'max_discount_amount': coupon.max_discount_amount,
+            'max_uses': coupon.max_uses,
+            'uses_count': 0,
+            'status': coupon.status,
+            'created_at': datetime.utcnow().isoformat(),
+            'updated_at': datetime.utcnow().isoformat()
+        }
+        
+        await db.coupons.insert_one(coupon_doc)
+        del coupon_doc['_id']
+        
+        return coupon_doc
+    except Exception as e:
+        logging.error(f"Error creating coupon: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.patch("/admin/coupons/{coupon_id}")
+async def update_coupon(coupon_id: str, coupon: CouponCreate):
+    """Update a coupon"""
+    try:
+        update_data = {
+            'code': coupon.code.upper(),
+            'description': coupon.description,
+            'discount_type': coupon.discount_type,
+            'discount_value': coupon.discount_value,
+            'min_order_amount': coupon.min_order_amount,
+            'max_discount_amount': coupon.max_discount_amount,
+            'max_uses': coupon.max_uses,
+            'status': coupon.status,
+            'updated_at': datetime.utcnow().isoformat()
+        }
+        
+        result = await db.coupons.update_one({'id': coupon_id}, {'$set': update_data})
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Coupon not found")
+        
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error updating coupon: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/admin/coupons/{coupon_id}")
+async def delete_coupon(coupon_id: str):
+    """Delete a coupon"""
+    try:
+        result = await db.coupons.delete_one({'id': coupon_id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Coupon not found")
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error deleting coupon: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ==================== MENU ====================
 
 @api_router.get("/menu/categories")
