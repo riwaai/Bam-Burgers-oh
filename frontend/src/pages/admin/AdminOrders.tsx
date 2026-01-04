@@ -55,7 +55,7 @@ const statusConfig: Record<OrderStatus, { label: string; bgColor: string }> = {
   cancelled: { label: 'Cancelled', bgColor: 'bg-red-500' },
 };
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL || '';
 
 const AdminOrders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
