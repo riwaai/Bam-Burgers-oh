@@ -599,16 +599,41 @@ async def get_coupons():
 async def validate_coupon(code: str, subtotal: float):
     """Validate a coupon code"""
     try:
-        coupons = await supabase_request(
-            'GET',
-            'coupons',
-            params={
-                'code': f'eq.{code}',
-                'tenant_id': f'eq.{TENANT_ID}',
-                'status': 'eq.active',
-                'select': '*'
+        # First try Supabase
+        try:
+            coupons = await supabase_request(
+                'GET',
+                'coupons',
+                params={
+                    'code': f'eq.{code.upper()}',
+                    'tenant_id': f'eq.{TENANT_ID}',
+                    'status': 'eq.active',
+                    'select': '*'
+                }
+            )
+        except:
+            coupons = None
+        
+        # Fallback to MongoDB
+        if not coupons:
+            mongo_coupon = await db.coupons.find_one({
+                'code': code.upper(),
+                'status': 'active'
+            })
+            if mongo_coupon:
+                del mongo_coupon['_id']
+                coupons = [mongo_coupon]
+        
+        # Built-in coupons fallback
+        if not coupons:
+            builtin_coupons = {
+                'SAVE10': {'discount_type': 'percentage', 'discount_value': 10, 'min_order_amount': 0, 'description': '10% off'},
+                'SAVE20': {'discount_type': 'percentage', 'discount_value': 20, 'min_order_amount': 3, 'description': '20% off on orders above 3 KWD'},
+                'FIRST50': {'discount_type': 'percentage', 'discount_value': 50, 'min_order_amount': 5, 'max_discount_amount': 3, 'description': '50% off up to 3 KWD'},
+                'FREE1': {'discount_type': 'fixed', 'discount_value': 1, 'min_order_amount': 5, 'description': '1 KWD off'},
             }
-        )
+            if code.upper() in builtin_coupons:
+                coupons = [{'id': 'builtin', 'code': code.upper(), **builtin_coupons[code.upper()]}]
         
         if not coupons:
             raise HTTPException(status_code=404, detail="Coupon not found or expired")
@@ -635,8 +660,8 @@ async def validate_coupon(code: str, subtotal: float):
         
         return {
             "valid": True,
-            "coupon_id": coupon['id'],
-            "code": coupon['code'],
+            "coupon_id": coupon.get('id', 'builtin'),
+            "code": coupon.get('code', code.upper()),
             "discount_type": discount_type,
             "discount_value": discount_value,
             "discount_amount": round(discount_amount, 3),
