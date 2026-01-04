@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { supabase, TENANT_ID } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
 interface LoyaltySettings {
   id?: string;
@@ -40,22 +41,13 @@ const AdminLoyalty = () => {
 
   const fetchSettings = async () => {
     try {
-      const { data, error } = await supabase
-        .from('loyalty_settings')
-        .select('*')
-        .eq('tenant_id', TENANT_ID)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
-
-      if (data) {
-        setSettings(data);
+      const response = await fetch(`${BACKEND_URL}/api/loyalty/settings`);
+      if (response.ok) {
+        const data = await response.json();
+        setSettings({ ...defaultSettings, ...data });
       }
     } catch (err) {
       console.error('Error fetching loyalty settings:', err);
-      // Use default settings if table doesn't exist
     } finally {
       setLoading(false);
     }
@@ -64,40 +56,27 @@ const AdminLoyalty = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      if (settings.id) {
-        // Update existing
-        const { error } = await supabase
-          .from('loyalty_settings')
-          .update({
-            points_per_kwd: settings.points_per_kwd,
-            kwd_per_point: settings.kwd_per_point,
-            min_points_redeem: settings.min_points_redeem,
-            signup_bonus: settings.signup_bonus,
-            referral_bonus: settings.referral_bonus,
-            birthday_bonus: settings.birthday_bonus,
-            is_active: settings.is_active,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', settings.id);
+      const response = await fetch(`${BACKEND_URL}/api/loyalty/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          points_per_kwd: settings.points_per_kwd,
+          kwd_per_point: settings.kwd_per_point,
+          min_points_redeem: settings.min_points_redeem,
+          signup_bonus: settings.signup_bonus,
+          referral_bonus: settings.referral_bonus,
+          birthday_bonus: settings.birthday_bonus,
+          is_active: settings.is_active,
+        }),
+      });
 
-        if (error) throw error;
-      } else {
-        // Create new
-        const { error } = await supabase
-          .from('loyalty_settings')
-          .insert({
-            tenant_id: TENANT_ID,
-            ...settings,
-          });
-
-        if (error) throw error;
-      }
-
+      if (!response.ok) throw new Error('Failed to save');
+      
       toast.success('Loyalty settings saved');
       fetchSettings();
     } catch (err) {
       console.error('Error saving loyalty settings:', err);
-      toast.error('Failed to save settings. The loyalty_settings table might not exist.');
+      toast.error('Failed to save settings');
     } finally {
       setSaving(false);
     }
