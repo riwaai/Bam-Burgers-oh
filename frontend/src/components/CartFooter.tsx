@@ -12,7 +12,7 @@ const CartFooter: React.FC = () => {
   return (
     <div 
       className="fixed bottom-0 left-0 right-0 z-50 bg-[#C8102E] text-white shadow-lg cursor-pointer"
-      onClick={() => navigate('/checkout')}
+      onClick={() => navigate('/cart')}
     >
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">

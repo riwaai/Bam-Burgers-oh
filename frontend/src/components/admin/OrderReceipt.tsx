@@ -52,10 +52,9 @@ const OrderReceipt: React.FC<OrderReceiptProps> = ({ order }) => {
 
   return (
     <div className="bg-white p-6 text-black text-sm" style={{ width: '320px', fontFamily: 'monospace' }}>
-      {/* Header with Logo */}
+      {/* Header */}
       <div className="text-center border-b-2 border-black pb-4 mb-4">
-        <img src={LOGO_URL} alt="Bam" className="h-16 mx-auto mb-2" />
-        <p className="font-bold text-lg">{RESTAURANT_NAME}</p>
+        <p className="font-bold text-2xl">{RESTAURANT_NAME}</p>
         <p className="text-xs">Salwa</p>
         <p className="text-xs">{formatKuwaitDate(order.created_at)}</p>
       </div>
@@ -158,7 +157,7 @@ const OrderReceipt: React.FC<OrderReceiptProps> = ({ order }) => {
         <p className="font-bold">Thank you for choosing</p>
         <p className="font-bold">{RESTAURANT_NAME}!</p>
         <p className="mt-2" dir="rtl">شكراً لاختياركم بام برجر</p>
-        <p className="mt-4 text-gray-500">Powered by TMBill v7.4.100</p>
+        <p className="mt-4 text-gray-500">Powered by RIWA POS</p>
       </div>
     </div>
   );
