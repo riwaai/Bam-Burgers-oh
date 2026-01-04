@@ -1,7 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 
-// Backend API URL
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
+// Backend API URL - use relative path if not configured (for same-domain deployment)
+const getBackendUrl = () => {
+  const url = import.meta.env.VITE_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL || '';
+  // If no URL configured, use relative path (assumes API is on same domain)
+  return url || '';
+};
+const BACKEND_URL = getBackendUrl();
 
 // Order status flow: pending -> accepted -> preparing -> ready -> out_for_delivery -> delivered
 export type OrderStatus = 'pending' | 'accepted' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
