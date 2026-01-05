@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Ticket, Plus, Save, Trash2, Edit2, X, Search } from 'lucide-react';
+import { Ticket, Plus, Save, Trash2, Edit2, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,9 +8,8 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { supabase, TENANT_ID } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
 interface Coupon {
   id: string;
@@ -54,20 +53,17 @@ const AdminCoupons = () => {
 
   const fetchCoupons = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/admin/coupons`);
-      if (response.ok) {
-        const data = await response.json();
-        setCoupons(data);
-      }
+      const { data, error } = await supabase
+        .from('coupons')
+        .select('*')
+        .eq('tenant_id', TENANT_ID)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setCoupons(data || []);
     } catch (err) {
       console.error('Error fetching coupons:', err);
-      // Use built-in coupons as fallback
-      setCoupons([
-        { id: 'b1', code: 'SAVE10', description: '10% off any order', discount_type: 'percentage', discount_value: 10, min_order_amount: 0, uses_count: 0, status: 'active' },
-        { id: 'b2', code: 'SAVE20', description: '20% off orders above 3 KWD', discount_type: 'percentage', discount_value: 20, min_order_amount: 3, uses_count: 0, status: 'active' },
-        { id: 'b3', code: 'FIRST50', description: '50% off up to 3 KWD', discount_type: 'percentage', discount_value: 50, min_order_amount: 5, max_discount_amount: 3, uses_count: 0, status: 'active' },
-        { id: 'b4', code: 'FREE1', description: '1 KWD off', discount_type: 'fixed', discount_value: 1, min_order_amount: 5, uses_count: 0, status: 'active' },
-      ]);
+      toast.error('Failed to load coupons');
     } finally {
       setLoading(false);
     }
@@ -81,34 +77,48 @@ const AdminCoupons = () => {
 
     setSaving(true);
     try {
-      const method = isEditing ? 'PATCH' : 'POST';
-      const url = isEditing 
-        ? `${BACKEND_URL}/api/admin/coupons/${editingCoupon.id}`
-        : `${BACKEND_URL}/api/admin/coupons`;
+      if (isEditing) {
+        const { error } = await supabase
+          .from('coupons')
+          .update({
+            code: editingCoupon.code.toUpperCase(),
+            description: editingCoupon.description,
+            discount_type: editingCoupon.discount_type,
+            discount_value: editingCoupon.discount_value,
+            min_order_amount: editingCoupon.min_order_amount,
+            max_discount_amount: editingCoupon.max_discount_amount,
+            max_uses: editingCoupon.max_uses,
+            status: editingCoupon.status,
+          })
+          .eq('id', editingCoupon.id);
+        
+        if (error) throw error;
+        toast.success('Coupon updated');
+      } else {
+        const { error } = await supabase
+          .from('coupons')
+          .insert({
+            tenant_id: TENANT_ID,
+            code: editingCoupon.code.toUpperCase(),
+            description: editingCoupon.description,
+            discount_type: editingCoupon.discount_type,
+            discount_value: editingCoupon.discount_value,
+            min_order_amount: editingCoupon.min_order_amount,
+            max_discount_amount: editingCoupon.max_discount_amount,
+            max_uses: editingCoupon.max_uses,
+            uses_count: 0,
+            status: editingCoupon.status,
+          });
+        
+        if (error) throw error;
+        toast.success('Coupon created');
+      }
 
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code: editingCoupon.code,
-          description: editingCoupon.description,
-          discount_type: editingCoupon.discount_type,
-          discount_value: editingCoupon.discount_value,
-          min_order_amount: editingCoupon.min_order_amount,
-          max_discount_amount: editingCoupon.max_discount_amount,
-          max_uses: editingCoupon.max_uses,
-          status: editingCoupon.status,
-        }),
-      });
-
-      if (!response.ok) throw new Error('Failed to save');
-
-      toast.success(isEditing ? 'Coupon updated' : 'Coupon created');
       setShowDialog(false);
       setEditingCoupon(defaultCoupon);
       fetchCoupons();
-    } catch (err) {
-      toast.error('Failed to save coupon');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save coupon');
     } finally {
       setSaving(false);
     }
@@ -118,12 +128,12 @@ const AdminCoupons = () => {
     if (!confirm('Delete this coupon?')) return;
     
     try {
-      const response = await fetch(`${BACKEND_URL}/api/admin/coupons/${couponId}`, {
-        method: 'DELETE',
-      });
+      const { error } = await supabase
+        .from('coupons')
+        .delete()
+        .eq('id', couponId);
 
-      if (!response.ok) throw new Error('Failed to delete');
-
+      if (error) throw error;
       toast.success('Coupon deleted');
       fetchCoupons();
     } catch (err) {
@@ -169,7 +179,6 @@ const AdminCoupons = () => {
         </Button>
       </div>
 
-      {/* Search */}
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
@@ -180,7 +189,6 @@ const AdminCoupons = () => {
         />
       </div>
 
-      {/* Coupon Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredCoupons.map((coupon) => (
           <Card key={coupon.id} className={`${coupon.status === 'inactive' ? 'opacity-60' : ''}`}>
@@ -238,11 +246,10 @@ const AdminCoupons = () => {
 
       {filteredCoupons.length === 0 && (
         <div className="text-center py-12 text-muted-foreground">
-          No coupons found
+          {searchTerm ? 'No coupons match your search' : 'No coupons found. Create one to get started!'}
         </div>
       )}
 
-      {/* Create/Edit Dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
