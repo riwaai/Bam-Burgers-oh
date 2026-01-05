@@ -52,8 +52,8 @@ const About = () => {
             </h1>
             <p className="text-white/80 max-w-2xl mx-auto text-lg">
               {isRTL 
-                ? 'نقدم أفضل برجر في الكويت منذ عام 2020. نؤمن بالجودة والطعم والخدمة المتميزة'
-                : 'Serving the best burgers in Kuwait since 2020. We believe in quality, taste, and exceptional service.'
+                ? 'نقدم أفضل برجر في الكويت منذ عام 2025. نؤمن بالجودة والطعم والخدمة المتميزة'
+                : 'Serving the best burgers in Kuwait since 2025. We believe in quality, taste, and exceptional service.'
               }
             </p>
           </div>
@@ -106,10 +106,10 @@ const About = () => {
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400',
-                'https://images.unsplash.com/photo-1553979459-d2229ba7433b?w=400',
-                'https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?w=400',
-                'https://images.unsplash.com/photo-1572802419224-296b0aeee0d9?w=400',
+                'https://i.pinimg.com/1200x/6c/98/ce/6c98cea3f45baa66b089a864f5633b4a.jpg',
+                'https://i.pinimg.com/1200x/81/52/cb/8152cb70a460856fe674fc07f46f68db.jpg',
+                'https://i.pinimg.com/1200x/20/7a/45/207a4513e969cd8161986bebae7ea117.jpg',
+                'https://i.pinimg.com/1200x/4b/f5/78/4bf578d31490356b404cd2249b49c15b.jpg',
               ].map((img, index) => (
                 <div key={index} className="aspect-square rounded-xl overflow-hidden">
                   <img 

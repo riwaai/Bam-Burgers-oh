@@ -37,7 +37,7 @@ const Index = () => {
         <div 
           className="absolute inset-0 bg-cover bg-center"
           style={{ 
-            backgroundImage: `url('https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=1920&q=80')` 
+            backgroundImage: `url('https://i.pinimg.com/1200x/2f/9c/bd/2f9cbd028868e879a48c1e1b2c7829e9.jpg')` 
           }}
         >
           <div className={`absolute inset-0 ${isRTL ? 'bg-gradient-to-l' : 'bg-gradient-to-r'} from-black/90 via-black/70 to-transparent`} />
