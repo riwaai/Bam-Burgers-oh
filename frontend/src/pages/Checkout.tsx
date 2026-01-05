@@ -137,6 +137,7 @@ const Checkout = () => {
           delivery_fee: deliveryFee,
           total_amount: orderTotal,
           notes: formData.notes || undefined,
+          payment_method: paymentMethod === 'online' ? 'tap' : 'cash',
         }),
       });
 
@@ -146,6 +147,14 @@ const Checkout = () => {
       }
 
       const orderResult = await response.json();
+      
+      // If Tap payment, redirect to payment page
+      if (paymentMethod === 'online' && orderResult.payment_url) {
+        clearCart();
+        window.location.href = orderResult.payment_url;
+        return;
+      }
+      
       toast.success(isRTL ? 'تم تقديم الطلب بنجاح!' : 'Order placed successfully!');
       clearCart();
       navigate(`/track-order/${orderResult.id}?order_number=${orderResult.order_number}`);
