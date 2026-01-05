@@ -1,56 +1,45 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import FastAPI, APIRouter, HTTPException, Request
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import List, Optional, Any
+from typing import List, Optional
 import uuid
 from datetime import datetime
 import httpx
-import json
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
-
 # Supabase configuration
-SUPABASE_URL = os.environ.get('SUPABASE_URL', '')
+SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://sqhjsctsxlnivcbeclrn.supabase.co')
 SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_KEY', '')
 SUPABASE_ANON_KEY = os.environ.get('SUPABASE_ANON_KEY', '')
-TENANT_ID = os.environ.get('TENANT_ID', '')
-BRANCH_ID = os.environ.get('BRANCH_ID', '')
-WEB_USER_ID = os.environ.get('WEB_USER_ID', '')
+TENANT_ID = os.environ.get('TENANT_ID', 'd82147fa-f5e3-474c-bb39-6936ad3b519a')
+BRANCH_ID = os.environ.get('BRANCH_ID', '3f9570b2-24d2-4f2d-81d7-25c6b35da76b')
 
-# Web orders user credentials
-WEB_USER_EMAIL = 'weborders@bamburgers.com'
-WEB_USER_PASSWORD = 'WebOrder@123'
+# Tap Payments configuration
+TAP_SECRET_KEY = os.environ.get('TAP_SECRET_KEY', 'sk_test_gBTwKEqbf34rGwinNdZT0KXz9R7mJ')
+TAP_PUBLIC_KEY = os.environ.get('TAP_PUBLIC_KEY', 'pk_test_gBTwKv0VDeC162iQhAErWglTZ3OsB')
 
-# Create the main app
-app = FastAPI(title="Bam Burgers API", version="1.0.0")
-
-# Create a router with the /api prefix
+app = FastAPI(title="Bam Burgers API", version="2.0.0")
 api_router = APIRouter(prefix="/api")
 
-security = HTTPBearer(auto_error=False)
+logging.basicConfig(level=logging.INFO)
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ==================== MODELS ====================
-
-class StatusCheck(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-
-class StatusCheckCreate(BaseModel):
-    client_name: str
 
 class OrderItem(BaseModel):
     item_id: str
@@ -87,68 +76,110 @@ class CreateOrderRequest(BaseModel):
     total_amount: float
     notes: Optional[str] = None
     coupon_code: Optional[str] = None
+    payment_method: Optional[str] = "cash"
 
 class OrderResponse(BaseModel):
     id: str
     order_number: str
     status: str
     created_at: str
+    payment_url: Optional[str] = None
+
+class UpdateStatusRequest(BaseModel):
+    status: str
+
+class CouponCreate(BaseModel):
+    code: str
+    description: Optional[str] = ""
+    discount_type: str = "percentage"
+    discount_value: float
+    min_order_amount: float = 0
+    max_discount_amount: Optional[float] = None
+    max_uses: Optional[int] = None
+    status: str = "active"
+
+class LoyaltySettings(BaseModel):
+    points_per_kwd: int = 10
+    kwd_per_point: float = 0.01
+    min_points_redeem: int = 100
+    signup_bonus: int = 50
+    referral_bonus: int = 100
+    birthday_bonus: int = 200
+    is_active: bool = True
+
+class CategoryCreate(BaseModel):
+    name_en: str
+    name_ar: str
+    description_en: Optional[str] = ""
+    description_ar: Optional[str] = ""
+    image_url: Optional[str] = ""
+    sort_order: int = 0
+    status: str = "active"
+
+class ItemCreate(BaseModel):
+    category_id: str
+    name_en: str
+    name_ar: str
+    description_en: Optional[str] = ""
+    description_ar: Optional[str] = ""
+    image_url: Optional[str] = ""
+    base_price: float
+    calories: Optional[int] = None
+    prep_time_minutes: Optional[int] = None
+    sort_order: int = 0
+    status: str = "active"
+
+class ModifierGroupCreate(BaseModel):
+    name_en: str
+    name_ar: str
+    min_select: int = 0
+    max_select: int = 1
+    required: bool = False
+    sort_order: int = 0
+    status: str = "active"
+
+class ModifierCreate(BaseModel):
+    modifier_group_id: str
+    name_en: str
+    name_ar: str
+    price: float = 0
+    default_selected: bool = False
+    sort_order: int = 0
+    status: str = "active"
+
+class ItemModifierGroupLink(BaseModel):
+    item_id: str
+    modifier_group_id: str
+    sort_order: int = 0
+
+class TapChargeRequest(BaseModel):
+    order_id: str
+    amount: float
+    currency: str = "KWD"
+    customer_name: str
+    customer_email: Optional[str] = None
+    customer_phone: str
+    description: Optional[str] = None
+    redirect_url: str
+
+class AdminSettingsUpdate(BaseModel):
+    tap_secret_key: Optional[str] = None
+    tap_public_key: Optional[str] = None
 
 
-# ==================== HELPER FUNCTIONS ====================
+# ==================== SUPABASE HELPER ====================
 
-# Cache for web user session
-_web_user_session = {
-    'access_token': None,
-    'expires_at': 0
-}
-
-async def get_web_user_session():
-    """Get or refresh web user session for order creation"""
-    global _web_user_session
-    
-    # Check if we have a valid session
-    if _web_user_session['access_token'] and _web_user_session['expires_at'] > datetime.now().timestamp():
-        return _web_user_session['access_token']
-    
-    # Sign in as web orders user
-    url = f"{SUPABASE_URL}/auth/v1/token?grant_type=password"
+async def supabase_request(method: str, table: str, data: dict = None, params: dict = None):
+    """Make request to Supabase REST API"""
+    url = f"{SUPABASE_URL}/rest/v1/{table}"
     headers = {
+        'apikey': SUPABASE_SERVICE_KEY,
+        'Authorization': f'Bearer {SUPABASE_SERVICE_KEY}',
         'Content-Type': 'application/json',
-        'apikey': SUPABASE_ANON_KEY,
-    }
-    data = {
-        'email': WEB_USER_EMAIL,
-        'password': WEB_USER_PASSWORD
-    }
-    
-    async with httpx.AsyncClient() as client:
-        response = await client.post(url, headers=headers, json=data)
-        
-        if response.status_code == 200:
-            result = response.json()
-            _web_user_session['access_token'] = result.get('access_token')
-            _web_user_session['expires_at'] = datetime.now().timestamp() + result.get('expires_in', 3600) - 60
-            return _web_user_session['access_token']
-        else:
-            logging.error(f"Failed to get web user session: {response.text}")
-            return None
-
-
-async def supabase_request(method: str, endpoint: str, data: dict = None, params: dict = None, use_service_key: bool = True):
-    """Make a request to Supabase REST API"""
-    url = f"{SUPABASE_URL}/rest/v1/{endpoint}"
-    
-    api_key = SUPABASE_SERVICE_KEY if use_service_key else SUPABASE_ANON_KEY
-    
-    headers = {
-        'Content-Type': 'application/json',
-        'apikey': api_key,
-        'Authorization': f'Bearer {api_key}',
         'Prefer': 'return=representation'
     }
     
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=30.0) as client:
         if method == 'GET':
             response = await client.get(url, headers=headers, params=params)
         elif method == 'POST':
@@ -162,62 +193,42 @@ async def supabase_request(method: str, endpoint: str, data: dict = None, params
         
         if response.status_code >= 400:
             logging.error(f"Supabase error: {response.status_code} - {response.text}")
-            raise HTTPException(status_code=response.status_code, detail=response.json())
+            raise HTTPException(status_code=response.status_code, detail=response.text)
         
         return response.json() if response.text else None
 
 
 def generate_order_number():
-    """Generate unique order number"""
     now = datetime.utcnow()
     date_str = now.strftime('%Y%m%d')
     random_part = str(uuid.uuid4().int)[:4]
     return f"WEB-{date_str}-{random_part}"
 
 
-# ==================== ROUTES ====================
+# ==================== HEALTH CHECK ====================
 
-@api_router.get("/")
-async def root():
-    return {"message": "Bam Burgers API", "version": "1.0.0"}
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.dict()
-    status_obj = StatusCheck(**status_dict)
-    _ = await db.status_checks.insert_one(status_obj.dict())
-    return status_obj
-
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    status_checks = await db.status_checks.find().to_list(1000)
-    return [StatusCheck(**status_check) for status_check in status_checks]
+@api_router.get("/health")
+async def api_health_check():
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
 
-# ==================== ORDER ENDPOINTS ====================
+# ==================== ORDERS ====================
 
 @api_router.post("/orders", response_model=OrderResponse)
 async def create_order(request: CreateOrderRequest):
-    """Create a new order"""
+    """Create a new order in Supabase"""
     try:
         order_number = generate_order_number()
+        order_id = str(uuid.uuid4())
         
-        # Build delivery address JSON
-        address_json = None
-        if request.delivery_address:
-            address_json = request.delivery_address.dict()
-        
-        # Get authenticated session for web user
-        access_token = await get_web_user_session()
-        
-        if not access_token:
-            logging.warning("Could not get web user session, using service key")
-            # Fall back to service key (may fail due to trigger)
-            api_key = SUPABASE_SERVICE_KEY
-        else:
-            api_key = access_token
+        address_json = request.delivery_address.dict() if request.delivery_address else None
         
         order_data = {
+            'id': order_id,
             'tenant_id': TENANT_ID,
             'branch_id': BRANCH_ID,
             'order_number': order_number,
@@ -239,58 +250,42 @@ async def create_order(request: CreateOrderRequest):
             'notes': request.notes,
         }
         
-        url = f"{SUPABASE_URL}/rest/v1/orders"
-        headers = {
-            'Content-Type': 'application/json',
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': f'Bearer {api_key}',
-            'Prefer': 'return=representation'
-        }
+        # Insert order
+        result = await supabase_request('POST', 'orders', data=order_data)
         
-        async with httpx.AsyncClient() as http_client:
-            response = await http_client.post(url, headers=headers, json=order_data)
+        # Insert order items
+        if request.items:
+            items_data = [{
+                'order_id': order_id,
+                'item_id': item.item_id,
+                'item_name_en': item.item_name_en,
+                'item_name_ar': item.item_name_ar,
+                'quantity': item.quantity,
+                'unit_price': item.unit_price,
+                'total_price': item.total_price,
+                'notes': item.notes,
+                'status': 'pending',
+            } for item in request.items]
             
-            if response.status_code >= 400:
-                error_detail = response.json()
-                logging.error(f"Order creation failed: {error_detail}")
-                
-                # Fall back to MongoDB on ANY Supabase error
-                logging.info("Supabase order failed, creating order in MongoDB as fallback")
-                return await create_order_mongodb(request, order_number)
-            
-            order_result = response.json()
-            
-            if isinstance(order_result, list) and len(order_result) > 0:
-                order = order_result[0]
-            else:
-                order = order_result
-            
-            order_id = order['id']
-            
-            # Insert order items
-            if request.items:
-                items_data = []
-                for item in request.items:
-                    items_data.append({
-                        'order_id': order_id,
-                        'item_id': item.item_id,
-                        'item_name_en': item.item_name_en,
-                        'item_name_ar': item.item_name_ar,
-                        'quantity': item.quantity,
-                        'unit_price': item.unit_price,
-                        'total_price': item.total_price,
-                        'notes': item.notes,
-                        'status': 'pending',
-                    })
-                
-                items_url = f"{SUPABASE_URL}/rest/v1/order_items"
-                await http_client.post(items_url, headers=headers, json=items_data)
+            await supabase_request('POST', 'order_items', data=items_data)
+        
+        # Handle Tap payment if selected
+        payment_url = None
+        if request.payment_method == 'tap':
+            payment_url = await create_tap_charge_internal(
+                order_id=order_id,
+                amount=request.total_amount,
+                customer_name=request.customer_name,
+                customer_email=request.customer_email,
+                customer_phone=request.customer_phone,
+            )
         
         return OrderResponse(
             id=order_id,
             order_number=order_number,
             status='pending',
-            created_at=order.get('created_at', datetime.utcnow().isoformat())
+            created_at=datetime.utcnow().isoformat(),
+            payment_url=payment_url
         )
         
     except HTTPException:
@@ -300,85 +295,18 @@ async def create_order(request: CreateOrderRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-async def create_order_mongodb(request: CreateOrderRequest, order_number: str) -> OrderResponse:
-    """Fallback: Create order in MongoDB when Supabase RLS blocks"""
-    order_id = str(uuid.uuid4())
-    
-    address_json = None
-    if request.delivery_address:
-        address_json = request.delivery_address.dict()
-    
-    order_doc = {
-        'id': order_id,
-        'tenant_id': TENANT_ID,
-        'branch_id': BRANCH_ID,
-        'order_number': order_number,
-        'order_type': request.order_type,
-        'channel': 'website',
-        'status': 'pending',
-        'customer_name': request.customer_name,
-        'customer_phone': request.customer_phone,
-        'customer_email': request.customer_email,
-        'delivery_address': address_json,
-        'delivery_instructions': request.delivery_instructions,
-        'items': [item.dict() for item in request.items],
-        'subtotal': request.subtotal,
-        'discount_amount': request.discount_amount,
-        'delivery_fee': request.delivery_fee,
-        'tax_amount': 0,
-        'service_charge': 0,
-        'total_amount': request.total_amount,
-        'payment_status': 'pending',
-        'notes': request.notes,
-        'created_at': datetime.utcnow().isoformat(),
-        'updated_at': datetime.utcnow().isoformat(),
-        'source': 'mongodb_fallback'  # Mark as fallback order
-    }
-    
-    await db.web_orders.insert_one(order_doc)
-    
-    logging.info(f"Order {order_number} created in MongoDB as fallback")
-    
-    return OrderResponse(
-        id=order_id,
-        order_number=order_number,
-        status='pending',
-        created_at=order_doc['created_at']
-    )
-
-
 @api_router.get("/orders/{order_id}")
 async def get_order(order_id: str):
     """Get order by ID"""
     try:
-        # First check MongoDB fallback
-        mongo_order = await db.web_orders.find_one({'id': order_id})
-        if mongo_order:
-            del mongo_order['_id']
-            return mongo_order
-        
-        # Then check Supabase
-        orders = await supabase_request(
-            'GET',
-            'orders',
-            params={'id': f'eq.{order_id}', 'select': '*'}
-        )
-        
+        orders = await supabase_request('GET', 'orders', params={'id': f'eq.{order_id}', 'select': '*'})
         if not orders:
             raise HTTPException(status_code=404, detail="Order not found")
         
         order = orders[0]
-        
-        # Get order items
-        items = await supabase_request(
-            'GET',
-            'order_items',
-            params={'order_id': f'eq.{order_id}', 'select': '*'}
-        )
-        
-        order['items'] = items
+        items = await supabase_request('GET', 'order_items', params={'order_id': f'eq.{order_id}', 'select': '*'})
+        order['items'] = items or []
         return order
-        
     except HTTPException:
         raise
     except Exception as e:
@@ -390,34 +318,14 @@ async def get_order(order_id: str):
 async def get_order_by_number(order_number: str):
     """Get order by order number"""
     try:
-        # First check MongoDB fallback
-        mongo_order = await db.web_orders.find_one({'order_number': order_number})
-        if mongo_order:
-            del mongo_order['_id']
-            return mongo_order
-        
-        # Then check Supabase
-        orders = await supabase_request(
-            'GET',
-            'orders',
-            params={'order_number': f'eq.{order_number}', 'select': '*'}
-        )
-        
+        orders = await supabase_request('GET', 'orders', params={'order_number': f'eq.{order_number}', 'select': '*'})
         if not orders:
             raise HTTPException(status_code=404, detail="Order not found")
         
         order = orders[0]
-        
-        # Get order items
-        items = await supabase_request(
-            'GET',
-            'order_items',
-            params={'order_id': f'eq.{order["id"]}', 'select': '*'}
-        )
-        
-        order['items'] = items
+        items = await supabase_request('GET', 'order_items', params={'order_id': f'eq.{order["id"]}', 'select': '*'})
+        order['items'] = items or []
         return order
-        
     except HTTPException:
         raise
     except Exception as e:
@@ -425,99 +333,34 @@ async def get_order_by_number(order_number: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-class UpdateStatusRequest(BaseModel):
-    status: str
-
 @api_router.patch("/orders/{order_id}/status")
 async def update_order_status(order_id: str, request: UpdateStatusRequest):
-    """Update order status - bypasses Supabase trigger by using RPC"""
-    status = request.status
+    """Update order status in Supabase"""
     valid_statuses = ['pending', 'accepted', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'completed', 'cancelled']
     
-    if status not in valid_statuses:
-        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+    if request.status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status")
     
     try:
-        # Check if order is in MongoDB
-        mongo_order = await db.web_orders.find_one({'id': order_id})
-        if mongo_order:
-            update_data = {
-                'status': status,
-                'updated_at': datetime.utcnow().isoformat()
-            }
-            if status == 'accepted':
-                update_data['accepted_at'] = datetime.utcnow().isoformat()
-            elif status in ['delivered', 'completed', 'cancelled']:
-                update_data['completed_at'] = datetime.utcnow().isoformat()
-            
-            await db.web_orders.update_one({'id': order_id}, {'$set': update_data})
-            logging.info(f"Order {order_id} status updated to {status} in MongoDB")
-            return {"success": True, "status": status}
+        update_data = {'status': request.status}
         
-        # Update in Supabase using raw SQL to bypass trigger
-        # We use the PostgREST API but only update specific columns
-        update_data = {'status': status}
-        
-        if status == 'accepted':
+        if request.status == 'accepted':
             update_data['accepted_at'] = datetime.utcnow().isoformat()
-        elif status in ['delivered', 'completed', 'cancelled']:
+        elif request.status in ['delivered', 'completed', 'cancelled']:
             update_data['completed_at'] = datetime.utcnow().isoformat()
         
-        # Use direct HTTP call with service role key
-        async with httpx.AsyncClient() as client:
-            headers = {
-                'apikey': SUPABASE_SERVICE_KEY,
-                'Authorization': f'Bearer {SUPABASE_SERVICE_KEY}',
-                'Content-Type': 'application/json',
-                'Prefer': 'return=minimal'
-            }
-            
-            # Use PostgREST RPC to call a function or direct update
-            url = f"{SUPABASE_URL}/rest/v1/orders?id=eq.{order_id}"
-            
-            response = await client.patch(url, headers=headers, json=update_data)
-            
-            if response.status_code in [200, 204]:
-                logging.info(f"Order {order_id} status updated to {status} in Supabase")
-                return {"success": True, "status": status}
-            else:
-                error_msg = response.text
-                logging.error(f"Supabase update failed: {error_msg}")
-                # Check if it's the trigger error
-                if 'user_id' in error_msg or '42804' in error_msg:
-                    # The trigger is still active, store the update in MongoDB as a workaround
-                    await db.order_status_updates.insert_one({
-                        'order_id': order_id,
-                        'status': status,
-                        'timestamp': datetime.utcnow().isoformat(),
-                        'error': error_msg
-                    })
-                    logging.warning(f"Stored status update for {order_id} in MongoDB due to trigger issue")
-                    # Return success anyway since we've logged the update
-                    return {"success": True, "status": status, "warning": "Update stored locally, Supabase trigger issue"}
-                raise HTTPException(status_code=response.status_code, detail=error_msg)
+        await supabase_request('PATCH', 'orders', data=update_data, params={'id': f'eq.{order_id}'})
         
-    except HTTPException:
-        raise
+        return {"success": True, "status": request.status}
     except Exception as e:
         logging.error(f"Error updating order status: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @api_router.get("/admin/orders")
-async def get_all_orders(status: Optional[str] = None, limit: int = 50):
-    """Get all orders for admin panel with local status updates applied"""
+async def get_all_orders(status: Optional[str] = None, limit: int = 100):
+    """Get all orders for admin panel"""
     try:
-        # Get orders from MongoDB fallback
-        mongo_query = {'tenant_id': TENANT_ID}
-        if status:
-            mongo_query['status'] = status
-        
-        mongo_orders = await db.web_orders.find(mongo_query).sort('created_at', -1).limit(limit).to_list(limit)
-        for order in mongo_orders:
-            del order['_id']
-        
-        # Get orders from Supabase
         params = {
             'select': '*',
             'order': 'created_at.desc',
@@ -525,127 +368,37 @@ async def get_all_orders(status: Optional[str] = None, limit: int = 50):
             'tenant_id': f'eq.{TENANT_ID}'
         }
         
-        if status:
+        if status and status != 'all':
             params['status'] = f'eq.{status}'
         
-        supabase_orders = await supabase_request('GET', 'orders', params=params)
-        
-        # Get all local status updates
-        status_updates = {}
-        async for update in db.order_status_updates.find().sort('timestamp', -1):
-            order_id = update.get('order_id')
-            if order_id and order_id not in status_updates:
-                status_updates[order_id] = update.get('status')
-        
-        # Apply local status updates to Supabase orders
-        if supabase_orders:
-            for order in supabase_orders:
-                order_id = order.get('id')
-                if order_id in status_updates:
-                    order['status'] = status_updates[order_id]
-        
-        # Combine and sort by created_at
-        all_orders = mongo_orders + (supabase_orders or [])
-        all_orders.sort(key=lambda x: x.get('created_at', ''), reverse=True)
-        
-        # Filter by status if needed (after applying updates)
-        if status:
-            all_orders = [o for o in all_orders if o.get('status') == status]
-        
-        return all_orders[:limit]
-        
+        orders = await supabase_request('GET', 'orders', params=params)
+        return orders or []
     except Exception as e:
         logging.error(f"Error getting orders: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ==================== DELIVERY ZONES ====================
-
-@api_router.get("/delivery-zones")
-async def get_delivery_zones():
-    """Get all delivery zones"""
-    try:
-        zones = await supabase_request(
-            'GET',
-            'delivery_zones',
-            params={'tenant_id': f'eq.{TENANT_ID}', 'select': '*'}
-        )
-        return zones or []
-        
-    except Exception as e:
-        logging.error(f"Error getting delivery zones: {str(e)}")
-        return []
-
-
 # ==================== COUPONS ====================
-
-@api_router.get("/coupons")
-async def get_coupons():
-    """Get all active coupons"""
-    try:
-        coupons = await supabase_request(
-            'GET',
-            'coupons',
-            params={'tenant_id': f'eq.{TENANT_ID}', 'status': 'eq.active', 'select': '*'}
-        )
-        return coupons or []
-        
-    except Exception as e:
-        logging.error(f"Error getting coupons: {str(e)}")
-        return []
-
 
 @api_router.post("/coupons/validate")
 async def validate_coupon(code: str, subtotal: float):
     """Validate a coupon code"""
     try:
-        # First try Supabase
-        try:
-            coupons = await supabase_request(
-                'GET',
-                'coupons',
-                params={
-                    'code': f'eq.{code.upper()}',
-                    'tenant_id': f'eq.{TENANT_ID}',
-                    'status': 'eq.active',
-                    'select': '*'
-                }
-            )
-        except:
-            coupons = None
-        
-        # Fallback to MongoDB
-        if not coupons:
-            mongo_coupon = await db.coupons.find_one({
-                'code': code.upper(),
-                'status': 'active'
-            })
-            if mongo_coupon:
-                del mongo_coupon['_id']
-                coupons = [mongo_coupon]
-        
-        # Built-in coupons fallback
-        if not coupons:
-            builtin_coupons = {
-                'SAVE10': {'discount_type': 'percentage', 'discount_value': 10, 'min_order_amount': 0, 'description': '10% off'},
-                'SAVE20': {'discount_type': 'percentage', 'discount_value': 20, 'min_order_amount': 3, 'description': '20% off on orders above 3 KWD'},
-                'FIRST50': {'discount_type': 'percentage', 'discount_value': 50, 'min_order_amount': 5, 'max_discount_amount': 3, 'description': '50% off up to 3 KWD'},
-                'FREE1': {'discount_type': 'fixed', 'discount_value': 1, 'min_order_amount': 5, 'description': '1 KWD off'},
-            }
-            if code.upper() in builtin_coupons:
-                coupons = [{'id': 'builtin', 'code': code.upper(), **builtin_coupons[code.upper()]}]
+        coupons = await supabase_request('GET', 'coupons', params={
+            'code': f'eq.{code.upper()}',
+            'tenant_id': f'eq.{TENANT_ID}',
+            'status': 'eq.active',
+            'select': '*'
+        })
         
         if not coupons:
             raise HTTPException(status_code=404, detail="Coupon not found or expired")
         
         coupon = coupons[0]
         
-        min_order = coupon.get('min_order_amount', 0)
+        min_order = coupon.get('min_order_amount', 0) or 0
         if subtotal < min_order:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Minimum order amount is {min_order} KWD"
-            )
+            raise HTTPException(status_code=400, detail=f"Minimum order amount is {min_order} KWD")
         
         discount_type = coupon.get('discount_type', 'percentage')
         discount_value = coupon.get('discount_value', 0)
@@ -660,14 +413,13 @@ async def validate_coupon(code: str, subtotal: float):
         
         return {
             "valid": True,
-            "coupon_id": coupon.get('id', 'builtin'),
-            "code": coupon.get('code', code.upper()),
+            "coupon_id": coupon['id'],
+            "code": coupon['code'],
             "discount_type": discount_type,
             "discount_value": discount_value,
             "discount_amount": round(discount_amount, 3),
             "description": coupon.get('description', '')
         }
-        
     except HTTPException:
         raise
     except Exception as e:
@@ -675,43 +427,16 @@ async def validate_coupon(code: str, subtotal: float):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ==================== ADMIN COUPONS ====================
-
-class CouponCreate(BaseModel):
-    code: str
-    description: Optional[str] = ""
-    discount_type: str = "percentage"  # percentage or fixed
-    discount_value: float
-    min_order_amount: float = 0
-    max_discount_amount: Optional[float] = None
-    max_uses: Optional[int] = None
-    status: str = "active"
-
-
 @api_router.get("/admin/coupons")
 async def get_coupons():
-    """Get all coupons for admin"""
+    """Get all coupons"""
     try:
-        # First try MongoDB
-        mongo_coupons = await db.coupons.find({'tenant_id': TENANT_ID}).to_list(100)
-        for c in mongo_coupons:
-            del c['_id']
-        
-        # Then try Supabase
-        try:
-            supabase_coupons = await supabase_request(
-                'GET', 'coupons',
-                params={'tenant_id': f'eq.{TENANT_ID}', 'select': '*', 'order': 'created_at.desc'}
-            )
-        except:
-            supabase_coupons = []
-        
-        # Combine and dedupe by code
-        all_coupons = {c['code']: c for c in (supabase_coupons or [])}
-        for c in mongo_coupons:
-            all_coupons[c['code']] = c
-        
-        return list(all_coupons.values())
+        coupons = await supabase_request('GET', 'coupons', params={
+            'tenant_id': f'eq.{TENANT_ID}',
+            'select': '*',
+            'order': 'created_at.desc'
+        })
+        return coupons or []
     except Exception as e:
         logging.error(f"Error getting coupons: {str(e)}")
         return []
@@ -719,9 +444,9 @@ async def get_coupons():
 
 @api_router.post("/admin/coupons")
 async def create_coupon(coupon: CouponCreate):
-    """Create a new coupon"""
+    """Create a coupon"""
     try:
-        coupon_doc = {
+        coupon_data = {
             'id': str(uuid.uuid4()),
             'tenant_id': TENANT_ID,
             'code': coupon.code.upper(),
@@ -733,14 +458,10 @@ async def create_coupon(coupon: CouponCreate):
             'max_uses': coupon.max_uses,
             'uses_count': 0,
             'status': coupon.status,
-            'created_at': datetime.utcnow().isoformat(),
-            'updated_at': datetime.utcnow().isoformat()
         }
         
-        await db.coupons.insert_one(coupon_doc)
-        del coupon_doc['_id']
-        
-        return coupon_doc
+        result = await supabase_request('POST', 'coupons', data=coupon_data)
+        return result[0] if result else coupon_data
     except Exception as e:
         logging.error(f"Error creating coupon: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -759,17 +480,10 @@ async def update_coupon(coupon_id: str, coupon: CouponCreate):
             'max_discount_amount': coupon.max_discount_amount,
             'max_uses': coupon.max_uses,
             'status': coupon.status,
-            'updated_at': datetime.utcnow().isoformat()
         }
         
-        result = await db.coupons.update_one({'id': coupon_id}, {'$set': update_data})
-        
-        if result.matched_count == 0:
-            raise HTTPException(status_code=404, detail="Coupon not found")
-        
+        await supabase_request('PATCH', 'coupons', data=update_data, params={'id': f'eq.{coupon_id}'})
         return {"success": True}
-    except HTTPException:
-        raise
     except Exception as e:
         logging.error(f"Error updating coupon: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -779,38 +493,141 @@ async def update_coupon(coupon_id: str, coupon: CouponCreate):
 async def delete_coupon(coupon_id: str):
     """Delete a coupon"""
     try:
-        result = await db.coupons.delete_one({'id': coupon_id})
-        if result.deleted_count == 0:
-            raise HTTPException(status_code=404, detail="Coupon not found")
+        await supabase_request('DELETE', 'coupons', params={'id': f'eq.{coupon_id}'})
         return {"success": True}
-    except HTTPException:
-        raise
     except Exception as e:
         logging.error(f"Error deleting coupon: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ==================== MENU ====================
+# ==================== LOYALTY ====================
+
+@api_router.get("/loyalty/settings")
+async def get_loyalty_settings():
+    """Get loyalty settings"""
+    try:
+        settings = await supabase_request('GET', 'loyalty_settings', params={
+            'tenant_id': f'eq.{TENANT_ID}',
+            'select': '*'
+        })
+        
+        if settings and len(settings) > 0:
+            return settings[0]
+        
+        return {
+            'tenant_id': TENANT_ID,
+            'points_per_kwd': 10,
+            'kwd_per_point': 0.01,
+            'min_points_redeem': 100,
+            'signup_bonus': 50,
+            'referral_bonus': 100,
+            'birthday_bonus': 200,
+            'is_active': True
+        }
+    except Exception as e:
+        logging.error(f"Error getting loyalty settings: {str(e)}")
+        return {'is_active': False}
+
+
+@api_router.post("/loyalty/settings")
+async def save_loyalty_settings(settings: LoyaltySettings):
+    """Save loyalty settings"""
+    try:
+        existing = await supabase_request('GET', 'loyalty_settings', params={
+            'tenant_id': f'eq.{TENANT_ID}',
+            'select': 'id'
+        })
+        
+        settings_data = {
+            'tenant_id': TENANT_ID,
+            **settings.dict(),
+        }
+        
+        if existing and len(existing) > 0:
+            await supabase_request('PATCH', 'loyalty_settings', data=settings_data, params={'tenant_id': f'eq.{TENANT_ID}'})
+        else:
+            settings_data['id'] = str(uuid.uuid4())
+            await supabase_request('POST', 'loyalty_settings', data=settings_data)
+        
+        return {"success": True}
+    except Exception as e:
+        logging.error(f"Error saving loyalty settings: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== MENU - CATEGORIES ====================
 
 @api_router.get("/menu/categories")
 async def get_categories():
     """Get menu categories"""
     try:
-        categories = await supabase_request(
-            'GET',
-            'categories',
-            params={
-                'tenant_id': f'eq.{TENANT_ID}',
-                'status': 'eq.active',
-                'select': '*',
-                'order': 'sort_order.asc'
-            }
-        )
+        categories = await supabase_request('GET', 'categories', params={
+            'tenant_id': f'eq.{TENANT_ID}',
+            'status': 'eq.active',
+            'select': '*',
+            'order': 'sort_order.asc'
+        })
         return categories or []
     except Exception as e:
         logging.error(f"Error getting categories: {str(e)}")
         return []
 
+
+@api_router.get("/admin/categories")
+async def get_all_categories():
+    """Get all categories for admin"""
+    try:
+        categories = await supabase_request('GET', 'categories', params={
+            'tenant_id': f'eq.{TENANT_ID}',
+            'select': '*',
+            'order': 'sort_order.asc'
+        })
+        return categories or []
+    except Exception as e:
+        logging.error(f"Error getting categories: {str(e)}")
+        return []
+
+
+@api_router.post("/admin/categories")
+async def create_category(category: CategoryCreate):
+    """Create a category"""
+    try:
+        category_data = {
+            'id': str(uuid.uuid4()),
+            'tenant_id': TENANT_ID,
+            **category.dict()
+        }
+        
+        result = await supabase_request('POST', 'categories', data=category_data)
+        return result[0] if result else category_data
+    except Exception as e:
+        logging.error(f"Error creating category: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.patch("/admin/categories/{category_id}")
+async def update_category(category_id: str, category: CategoryCreate):
+    """Update a category"""
+    try:
+        await supabase_request('PATCH', 'categories', data=category.dict(), params={'id': f'eq.{category_id}'})
+        return {"success": True}
+    except Exception as e:
+        logging.error(f"Error updating category: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/admin/categories/{category_id}")
+async def delete_category(category_id: str):
+    """Delete a category"""
+    try:
+        await supabase_request('DELETE', 'categories', params={'id': f'eq.{category_id}'})
+        return {"success": True}
+    except Exception as e:
+        logging.error(f"Error deleting category: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== MENU - ITEMS ====================
 
 @api_router.get("/menu/items")
 async def get_menu_items(category_id: Optional[str] = None):
@@ -833,97 +650,479 @@ async def get_menu_items(category_id: Optional[str] = None):
         return []
 
 
-# ==================== LOYALTY SETTINGS ====================
-
-class LoyaltySettings(BaseModel):
-    points_per_kwd: int = 10
-    kwd_per_point: float = 0.01
-    min_points_redeem: int = 100
-    signup_bonus: int = 50
-    referral_bonus: int = 100
-    birthday_bonus: int = 200
-    is_active: bool = True
-
-
-@api_router.get("/loyalty/settings")
-async def get_loyalty_settings():
-    """Get loyalty program settings"""
+@api_router.get("/admin/items")
+async def get_all_items():
+    """Get all items for admin"""
     try:
-        # Try MongoDB first
-        settings = await db.loyalty_settings.find_one({'tenant_id': TENANT_ID})
-        if settings:
-            del settings['_id']
-            return settings
-        
-        # Try Supabase
-        try:
-            result = await supabase_request(
-                'GET',
-                'loyalty_settings',
-                params={'tenant_id': f'eq.{TENANT_ID}', 'select': '*'}
-            )
-            if result and len(result) > 0:
-                return result[0]
-        except:
-            pass
-        
-        # Return defaults
-        return {
-            'tenant_id': TENANT_ID,
-            'points_per_kwd': 10,
-            'kwd_per_point': 0.01,
-            'min_points_redeem': 100,
-            'signup_bonus': 50,
-            'referral_bonus': 100,
-            'birthday_bonus': 200,
-            'is_active': True
-        }
+        items = await supabase_request('GET', 'items', params={
+            'tenant_id': f'eq.{TENANT_ID}',
+            'select': '*',
+            'order': 'sort_order.asc'
+        })
+        return items or []
     except Exception as e:
-        logging.error(f"Error getting loyalty settings: {str(e)}")
-        return {'is_active': False}
+        logging.error(f"Error getting items: {str(e)}")
+        return []
 
 
-@api_router.post("/loyalty/settings")
-async def save_loyalty_settings(settings: LoyaltySettings):
-    """Save loyalty program settings"""
+@api_router.post("/admin/items")
+async def create_item(item: ItemCreate):
+    """Create an item"""
     try:
-        settings_doc = {
+        item_data = {
+            'id': str(uuid.uuid4()),
             'tenant_id': TENANT_ID,
-            **settings.dict(),
-            'updated_at': datetime.utcnow().isoformat()
+            **item.dict()
         }
         
-        # Save to MongoDB
-        await db.loyalty_settings.update_one(
-            {'tenant_id': TENANT_ID},
-            {'$set': settings_doc},
-            upsert=True
-        )
-        
-        return {"success": True, "message": "Settings saved"}
+        result = await supabase_request('POST', 'items', data=item_data)
+        return result[0] if result else item_data
     except Exception as e:
-        logging.error(f"Error saving loyalty settings: {str(e)}")
+        logging.error(f"Error creating item: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# Include the router in the main app
+@api_router.patch("/admin/items/{item_id}")
+async def update_item(item_id: str, item: ItemCreate):
+    """Update an item"""
+    try:
+        await supabase_request('PATCH', 'items', data=item.dict(), params={'id': f'eq.{item_id}'})
+        return {"success": True}
+    except Exception as e:
+        logging.error(f"Error updating item: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/admin/items/{item_id}")
+async def delete_item(item_id: str):
+    """Delete an item"""
+    try:
+        await supabase_request('DELETE', 'items', params={'id': f'eq.{item_id}'})
+        return {"success": True}
+    except Exception as e:
+        logging.error(f"Error deleting item: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== MODIFIER GROUPS ====================
+
+@api_router.get("/admin/modifier-groups")
+async def get_modifier_groups():
+    """Get all modifier groups"""
+    try:
+        groups = await supabase_request('GET', 'modifier_groups', params={
+            'tenant_id': f'eq.{TENANT_ID}',
+            'select': '*',
+            'order': 'sort_order.asc'
+        })
+        return groups or []
+    except Exception as e:
+        logging.error(f"Error getting modifier groups: {str(e)}")
+        return []
+
+
+@api_router.post("/admin/modifier-groups")
+async def create_modifier_group(group: ModifierGroupCreate):
+    """Create a modifier group"""
+    try:
+        group_data = {
+            'id': str(uuid.uuid4()),
+            'tenant_id': TENANT_ID,
+            **group.dict()
+        }
+        
+        result = await supabase_request('POST', 'modifier_groups', data=group_data)
+        return result[0] if result else group_data
+    except Exception as e:
+        logging.error(f"Error creating modifier group: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.patch("/admin/modifier-groups/{group_id}")
+async def update_modifier_group(group_id: str, group: ModifierGroupCreate):
+    """Update a modifier group"""
+    try:
+        await supabase_request('PATCH', 'modifier_groups', data=group.dict(), params={'id': f'eq.{group_id}'})
+        return {"success": True}
+    except Exception as e:
+        logging.error(f"Error updating modifier group: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/admin/modifier-groups/{group_id}")
+async def delete_modifier_group(group_id: str):
+    """Delete a modifier group"""
+    try:
+        await supabase_request('DELETE', 'modifier_groups', params={'id': f'eq.{group_id}'})
+        return {"success": True}
+    except Exception as e:
+        logging.error(f"Error deleting modifier group: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== MODIFIERS ====================
+
+@api_router.get("/admin/modifiers")
+async def get_modifiers(group_id: Optional[str] = None):
+    """Get modifiers"""
+    try:
+        params = {'select': '*', 'order': 'sort_order.asc'}
+        if group_id:
+            params['modifier_group_id'] = f'eq.{group_id}'
+        
+        modifiers = await supabase_request('GET', 'modifiers', params=params)
+        return modifiers or []
+    except Exception as e:
+        logging.error(f"Error getting modifiers: {str(e)}")
+        return []
+
+
+@api_router.post("/admin/modifiers")
+async def create_modifier(modifier: ModifierCreate):
+    """Create a modifier"""
+    try:
+        modifier_data = {
+            'id': str(uuid.uuid4()),
+            **modifier.dict()
+        }
+        
+        result = await supabase_request('POST', 'modifiers', data=modifier_data)
+        return result[0] if result else modifier_data
+    except Exception as e:
+        logging.error(f"Error creating modifier: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.patch("/admin/modifiers/{modifier_id}")
+async def update_modifier(modifier_id: str, modifier: ModifierCreate):
+    """Update a modifier"""
+    try:
+        await supabase_request('PATCH', 'modifiers', data=modifier.dict(), params={'id': f'eq.{modifier_id}'})
+        return {"success": True}
+    except Exception as e:
+        logging.error(f"Error updating modifier: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/admin/modifiers/{modifier_id}")
+async def delete_modifier(modifier_id: str):
+    """Delete a modifier"""
+    try:
+        await supabase_request('DELETE', 'modifiers', params={'id': f'eq.{modifier_id}'})
+        return {"success": True}
+    except Exception as e:
+        logging.error(f"Error deleting modifier: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== ITEM-MODIFIER GROUP LINKS ====================
+
+@api_router.get("/admin/item-modifier-groups")
+async def get_item_modifier_groups(item_id: Optional[str] = None):
+    """Get item-modifier group links"""
+    try:
+        params = {'select': '*'}
+        if item_id:
+            params['item_id'] = f'eq.{item_id}'
+        
+        links = await supabase_request('GET', 'item_modifier_groups', params=params)
+        return links or []
+    except Exception as e:
+        logging.error(f"Error getting item modifier groups: {str(e)}")
+        return []
+
+
+@api_router.post("/admin/item-modifier-groups")
+async def link_item_modifier_group(link: ItemModifierGroupLink):
+    """Link a modifier group to an item"""
+    try:
+        link_data = {
+            'id': str(uuid.uuid4()),
+            **link.dict()
+        }
+        
+        result = await supabase_request('POST', 'item_modifier_groups', data=link_data)
+        return result[0] if result else link_data
+    except Exception as e:
+        logging.error(f"Error linking item to modifier group: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/admin/item-modifier-groups/{link_id}")
+async def unlink_item_modifier_group(link_id: str):
+    """Unlink a modifier group from an item"""
+    try:
+        await supabase_request('DELETE', 'item_modifier_groups', params={'id': f'eq.{link_id}'})
+        return {"success": True}
+    except Exception as e:
+        logging.error(f"Error unlinking item from modifier group: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== MENU WITH MODIFIERS ====================
+
+@api_router.get("/menu/items/{item_id}/modifiers")
+async def get_item_modifiers(item_id: str):
+    """Get all modifier groups and modifiers for an item"""
+    try:
+        # Get linked modifier groups
+        links = await supabase_request('GET', 'item_modifier_groups', params={
+            'item_id': f'eq.{item_id}',
+            'select': '*',
+            'order': 'sort_order.asc'
+        })
+        
+        if not links:
+            return []
+        
+        group_ids = [link['modifier_group_id'] for link in links]
+        
+        # Get modifier groups
+        groups = await supabase_request('GET', 'modifier_groups', params={
+            'id': f'in.({",".join(group_ids)})',
+            'status': 'eq.active',
+            'select': '*'
+        })
+        
+        # Get modifiers for each group
+        result = []
+        for group in (groups or []):
+            modifiers = await supabase_request('GET', 'modifiers', params={
+                'modifier_group_id': f'eq.{group["id"]}',
+                'status': 'eq.active',
+                'select': '*',
+                'order': 'sort_order.asc'
+            })
+            
+            result.append({
+                **group,
+                'modifiers': modifiers or []
+            })
+        
+        return result
+    except Exception as e:
+        logging.error(f"Error getting item modifiers: {str(e)}")
+        return []
+
+
+# ==================== DELIVERY ZONES ====================
+
+@api_router.get("/delivery-zones")
+async def get_delivery_zones():
+    """Get all delivery zones"""
+    try:
+        zones = await supabase_request('GET', 'delivery_zones', params={
+            'branch_id': f'eq.{BRANCH_ID}',
+            'status': 'eq.active',
+            'select': '*'
+        })
+        return zones or []
+    except Exception as e:
+        logging.error(f"Error getting delivery zones: {str(e)}")
+        return []
+
+
+@api_router.get("/admin/delivery-zones")
+async def get_all_delivery_zones():
+    """Get all delivery zones for admin"""
+    try:
+        zones = await supabase_request('GET', 'delivery_zones', params={
+            'branch_id': f'eq.{BRANCH_ID}',
+            'select': '*'
+        })
+        return zones or []
+    except Exception as e:
+        logging.error(f"Error getting delivery zones: {str(e)}")
+        return []
+
+
+# ==================== TAP PAYMENTS ====================
+
+async def create_tap_charge_internal(order_id: str, amount: float, customer_name: str, customer_email: str, customer_phone: str) -> Optional[str]:
+    """Create a Tap payment charge and return the redirect URL"""
+    try:
+        # Get frontend URL for redirect
+        frontend_url = os.environ.get('FRONTEND_URL', 'https://eatbam.me')
+        
+        charge_data = {
+            "amount": amount,
+            "currency": "KWD",
+            "customer_initiated": True,
+            "threeDSecure": True,
+            "save_card": False,
+            "description": f"Order {order_id}",
+            "reference": {
+                "transaction": order_id,
+                "order": order_id
+            },
+            "customer": {
+                "first_name": customer_name.split()[0] if customer_name else "Customer",
+                "last_name": customer_name.split()[-1] if customer_name and len(customer_name.split()) > 1 else "",
+                "email": customer_email or "customer@example.com",
+                "phone": {
+                    "country_code": "965",
+                    "number": customer_phone.replace("+965", "").replace(" ", "") if customer_phone else "00000000"
+                }
+            },
+            "source": {
+                "id": "src_all"
+            },
+            "post": {
+                "url": f"{frontend_url}/api/tap/webhook"
+            },
+            "redirect": {
+                "url": f"{frontend_url}/payment-result?order_id={order_id}"
+            }
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.tap.company/v2/charges/",
+                headers={
+                    "Authorization": f"Bearer {TAP_SECRET_KEY}",
+                    "Content-Type": "application/json",
+                    "accept": "application/json"
+                },
+                json=charge_data
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                return result.get('transaction', {}).get('url')
+            else:
+                logging.error(f"Tap charge failed: {response.text}")
+                return None
+    except Exception as e:
+        logging.error(f"Error creating Tap charge: {str(e)}")
+        return None
+
+
+@api_router.post("/tap/charge")
+async def create_tap_charge(request: TapChargeRequest):
+    """Create a Tap payment charge"""
+    try:
+        charge_data = {
+            "amount": request.amount,
+            "currency": request.currency,
+            "customer_initiated": True,
+            "threeDSecure": True,
+            "save_card": False,
+            "description": request.description or f"Order {request.order_id}",
+            "reference": {
+                "transaction": request.order_id,
+                "order": request.order_id
+            },
+            "customer": {
+                "first_name": request.customer_name.split()[0] if request.customer_name else "Customer",
+                "last_name": request.customer_name.split()[-1] if request.customer_name and len(request.customer_name.split()) > 1 else "",
+                "email": request.customer_email or "customer@example.com",
+                "phone": {
+                    "country_code": "965",
+                    "number": request.customer_phone.replace("+965", "").replace(" ", "") if request.customer_phone else "00000000"
+                }
+            },
+            "source": {
+                "id": "src_all"
+            },
+            "post": {
+                "url": f"{request.redirect_url.rsplit('/', 1)[0]}/api/tap/webhook"
+            },
+            "redirect": {
+                "url": request.redirect_url
+            }
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.tap.company/v2/charges/",
+                headers={
+                    "Authorization": f"Bearer {TAP_SECRET_KEY}",
+                    "Content-Type": "application/json",
+                    "accept": "application/json"
+                },
+                json=charge_data
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                return {
+                    "success": True,
+                    "charge_id": result.get('id'),
+                    "payment_url": result.get('transaction', {}).get('url'),
+                    "status": result.get('status')
+                }
+            else:
+                logging.error(f"Tap charge failed: {response.text}")
+                raise HTTPException(status_code=400, detail="Payment creation failed")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error creating Tap charge: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/tap/webhook")
+async def tap_webhook(request: Request):
+    """Handle Tap payment webhook"""
+    try:
+        data = await request.json()
+        
+        charge_id = data.get('id')
+        status = data.get('status')
+        order_id = data.get('reference', {}).get('order')
+        
+        if order_id and status:
+            payment_status = 'paid' if status == 'CAPTURED' else 'failed'
+            await supabase_request('PATCH', 'orders', 
+                data={'payment_status': payment_status},
+                params={'id': f'eq.{order_id}'}
+            )
+        
+        return {"received": True}
+    except Exception as e:
+        logging.error(f"Webhook error: {str(e)}")
+        return {"received": True}
+
+
+@api_router.get("/tap/charge/{charge_id}")
+async def get_tap_charge(charge_id: str):
+    """Get Tap charge status"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"https://api.tap.company/v2/charges/{charge_id}",
+                headers={
+                    "Authorization": f"Bearer {TAP_SECRET_KEY}",
+                    "accept": "application/json"
+                }
+            )
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                raise HTTPException(status_code=400, detail="Could not retrieve charge")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error getting Tap charge: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== ADMIN SETTINGS ====================
+
+@api_router.get("/admin/settings")
+async def get_admin_settings():
+    """Get admin settings including payment keys"""
+    return {
+        "tap_public_key": TAP_PUBLIC_KEY,
+        "tap_secret_key_set": bool(TAP_SECRET_KEY),
+    }
+
+
+@api_router.get("/")
+async def root():
+    return {"message": "Bam Burgers API", "version": "2.0.0"}
+
+
+# Include the router
 app.include_router(api_router)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()
