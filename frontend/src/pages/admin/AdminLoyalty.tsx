@@ -5,9 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { supabase, TENANT_ID } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
 interface LoyaltySettings {
   id?: string;
@@ -41,9 +40,15 @@ const AdminLoyalty = () => {
 
   const fetchSettings = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/loyalty/settings`);
-      if (response.ok) {
-        const data = await response.json();
+      const { data, error } = await supabase
+        .from('loyalty_settings')
+        .select('*')
+        .eq('tenant_id', TENANT_ID)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') throw error;
+      
+      if (data) {
         setSettings({ ...defaultSettings, ...data });
       }
     } catch (err) {
@@ -56,27 +61,52 @@ const AdminLoyalty = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const response = await fetch(`${BACKEND_URL}/api/loyalty/settings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          points_per_kwd: settings.points_per_kwd,
-          kwd_per_point: settings.kwd_per_point,
-          min_points_redeem: settings.min_points_redeem,
-          signup_bonus: settings.signup_bonus,
-          referral_bonus: settings.referral_bonus,
-          birthday_bonus: settings.birthday_bonus,
-          is_active: settings.is_active,
-        }),
-      });
+      // Check if settings exist
+      const { data: existing } = await supabase
+        .from('loyalty_settings')
+        .select('id')
+        .eq('tenant_id', TENANT_ID)
+        .single();
 
-      if (!response.ok) throw new Error('Failed to save');
-      
+      if (existing) {
+        // Update
+        const { error } = await supabase
+          .from('loyalty_settings')
+          .update({
+            points_per_kwd: settings.points_per_kwd,
+            kwd_per_point: settings.kwd_per_point,
+            min_points_redeem: settings.min_points_redeem,
+            signup_bonus: settings.signup_bonus,
+            referral_bonus: settings.referral_bonus,
+            birthday_bonus: settings.birthday_bonus,
+            is_active: settings.is_active,
+          })
+          .eq('tenant_id', TENANT_ID);
+        
+        if (error) throw error;
+      } else {
+        // Insert
+        const { error } = await supabase
+          .from('loyalty_settings')
+          .insert({
+            tenant_id: TENANT_ID,
+            points_per_kwd: settings.points_per_kwd,
+            kwd_per_point: settings.kwd_per_point,
+            min_points_redeem: settings.min_points_redeem,
+            signup_bonus: settings.signup_bonus,
+            referral_bonus: settings.referral_bonus,
+            birthday_bonus: settings.birthday_bonus,
+            is_active: settings.is_active,
+          });
+        
+        if (error) throw error;
+      }
+
       toast.success('Loyalty settings saved');
       fetchSettings();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving loyalty settings:', err);
-      toast.error('Failed to save settings');
+      toast.error(err.message || 'Failed to save settings');
     } finally {
       setSaving(false);
     }
@@ -103,7 +133,6 @@ const AdminLoyalty = () => {
         </Button>
       </div>
 
-      {/* Program Status */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -125,7 +154,6 @@ const AdminLoyalty = () => {
         </CardContent>
       </Card>
 
-      {/* Points Configuration */}
       <Card>
         <CardHeader>
           <CardTitle>Points Configuration</CardTitle>
@@ -171,7 +199,6 @@ const AdminLoyalty = () => {
         </CardContent>
       </Card>
 
-      {/* Bonus Points */}
       <Card>
         <CardHeader>
           <CardTitle>Bonus Points</CardTitle>
@@ -210,7 +237,6 @@ const AdminLoyalty = () => {
         </CardContent>
       </Card>
 
-      {/* Info Card */}
       <Card className="bg-blue-50 border-blue-200">
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
