@@ -83,11 +83,19 @@ const App = () => (
                       <Route index element={<AdminDashboard />} />
                       <Route path="orders" element={<AdminOrders />} />
                       <Route path="menu" element={<AdminMenu />} />
+                      <Route path="modifiers" element={<AdminModifiers />} />
                       <Route path="coupons" element={<AdminCoupons />} />
                       <Route path="loyalty" element={<AdminLoyalty />} />
                       <Route path="zones" element={<AdminZones />} />
                       <Route path="settings" element={<AdminSettings />} />
                     </Route>
+                    
+                    {/* Payment Result */}
+                    <Route path="/payment-result" element={
+                      <React.Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+                        <PaymentResult />
+                      </React.Suspense>
+                    } />
                     
                     {/* 404 */}
                     <Route path="*" element={<NotFound />} />
