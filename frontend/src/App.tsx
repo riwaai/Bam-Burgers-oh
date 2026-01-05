@@ -38,6 +38,10 @@ import AdminCoupons from "./pages/admin/AdminCoupons";
 import AdminLoyalty from "./pages/admin/AdminLoyalty";
 import AdminZones from "./pages/admin/AdminZones";
 import AdminSettings from "./pages/admin/AdminSettings";
+import AdminModifiers from "./pages/admin/AdminModifiers";
+
+// Payment Result Page
+const PaymentResult = React.lazy(() => import("./pages/PaymentResult"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
