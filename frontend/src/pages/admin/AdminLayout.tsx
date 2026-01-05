@@ -11,6 +11,7 @@ import {
   LogOut,
   Menu,
   X,
+  Layers,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
@@ -21,6 +22,7 @@ const navItems = [
   { path: '/admin', icon: LayoutDashboard, label: 'Dashboard', exact: true },
   { path: '/admin/orders', icon: ShoppingCart, label: 'Orders' },
   { path: '/admin/menu', icon: UtensilsCrossed, label: 'Menu' },
+  { path: '/admin/modifiers', icon: Layers, label: 'Modifiers' },
   { path: '/admin/coupons', icon: Tag, label: 'Coupons' },
   { path: '/admin/loyalty', icon: Gift, label: 'Loyalty' },
   { path: '/admin/zones', icon: MapPin, label: 'Delivery Zones' },
