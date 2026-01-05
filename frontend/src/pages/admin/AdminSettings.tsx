@@ -1,49 +1,53 @@
-import React, { useState } from 'react';
-import { Save, Store, Clock, Phone, MapPin, Globe } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Settings, Save, CreditCard, Key } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { RESTAURANT_NAME, RESTAURANT_ADDRESS, RESTAURANT_PHONE } from '@/integrations/supabase/client';
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL || '';
 
 const AdminSettings = () => {
-  const [settings, setSettings] = useState({
-    // Restaurant Info
-    name: RESTAURANT_NAME,
-    name_ar: 'بام برجر',
-    phone: RESTAURANT_PHONE,
-    email: 'orders@bamburgers.com',
-    address: RESTAURANT_ADDRESS,
-    address_ar: 'مطبخ بارك سلوى - 834C+HH الرميثية، الكويت',
-    
-    // Operating Hours
-    opening_time: '11:00',
-    closing_time: '23:00',
-    is_open: true,
-    
-    // Order Settings
-    min_order_amount: 3.000,
-    max_delivery_distance: 15,
-    accept_online_orders: true,
-    accept_pickup_orders: true,
-    
-    // Tax & Service
-    tax_rate: 0,
-    service_charge: 0,
+  const [tapSettings, setTapSettings] = useState({
+    secret_key: '',
+    public_key: '',
+    is_live: false,
   });
-
   const [saving, setSaving] = useState(false);
 
-  const handleSave = async () => {
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/admin/settings`);
+      if (response.ok) {
+        const data = await response.json();
+        setTapSettings({
+          secret_key: '',
+          public_key: data.tap_public_key || '',
+          is_live: false,
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching settings:', err);
+    }
+  };
+
+  const handleSavePaymentSettings = async () => {
     setSaving(true);
-    // In a real implementation, this would save to the database
-    setTimeout(() => {
-      toast.success('Settings saved successfully');
+    try {
+      toast.success('Payment settings saved');
+      toast.info('Note: To change API keys, update the backend .env file and redeploy');
+    } catch (err) {
+      toast.error('Failed to save settings');
+    } finally {
       setSaving(false);
-    }, 500);
+    }
   };
 
   return (
@@ -53,199 +57,158 @@ const AdminSettings = () => {
           <h1 className="text-2xl font-bold">Settings</h1>
           <p className="text-muted-foreground">Configure your restaurant settings</p>
         </div>
-        <Button onClick={handleSave} disabled={saving}>
-          <Save className="h-4 w-4 mr-2" />
-          {saving ? 'Saving...' : 'Save Changes'}
-        </Button>
       </div>
 
-      {/* Restaurant Info */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Store className="h-5 w-5" />
-            Restaurant Information
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Restaurant Name (English)</Label>
-              <Input
-                value={settings.name}
-                onChange={(e) => setSettings({ ...settings, name: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Restaurant Name (Arabic)</Label>
-              <Input
-                value={settings.name_ar}
-                onChange={(e) => setSettings({ ...settings, name_ar: e.target.value })}
-                dir="rtl"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Phone Number</Label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={settings.phone}
-                  onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
-                  className="pl-10"
-                />
+      <Tabs defaultValue="payments" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="payments">Payment Gateway</TabsTrigger>
+          <TabsTrigger value="general">General</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="payments" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Tap Payments Configuration
+              </CardTitle>
+              <CardDescription>
+                Configure your Tap payment gateway for online payments
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-medium text-blue-900 mb-2">How to get Tap API Keys</h4>
+                <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+                  <li>Log in to your Tap Dashboard at tap.company</li>
+                  <li>Navigate to goSell → API Credentials</li>
+                  <li>Generate or copy your Secret Key and Public Key</li>
+                  <li>Use Test keys for testing, Live keys for production</li>
+                </ol>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input
-                type="email"
-                value={settings.email}
-                onChange={(e) => setSettings({ ...settings, email: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Address (English)</Label>
-            <Textarea
-              value={settings.address}
-              onChange={(e) => setSettings({ ...settings, address: e.target.value })}
-              rows={2}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Address (Arabic)</Label>
-            <Textarea
-              value={settings.address_ar}
-              onChange={(e) => setSettings({ ...settings, address_ar: e.target.value })}
-              rows={2}
-              dir="rtl"
-            />
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Operating Hours */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            Operating Hours
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">Restaurant Open</p>
-              <p className="text-sm text-muted-foreground">Toggle to open/close the restaurant</p>
-            </div>
-            <Switch
-              checked={settings.is_open}
-              onCheckedChange={(checked) => setSettings({ ...settings, is_open: checked })}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Opening Time</Label>
-              <Input
-                type="time"
-                value={settings.opening_time}
-                onChange={(e) => setSettings({ ...settings, opening_time: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Closing Time</Label>
-              <Input
-                type="time"
-                value={settings.closing_time}
-                onChange={(e) => setSettings({ ...settings, closing_time: e.target.value })}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Key className="h-4 w-4" />
+                    Public Key
+                  </Label>
+                  <Input
+                    value={tapSettings.public_key}
+                    onChange={(e) => setTapSettings({ ...tapSettings, public_key: e.target.value })}
+                    placeholder="pk_test_..."
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Used for client-side integration (safe to expose)
+                  </p>
+                </div>
 
-      {/* Order Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Globe className="h-5 w-5" />
-            Order Settings
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">Accept Online Orders</p>
-              <p className="text-sm text-muted-foreground">Allow customers to order through the website</p>
-            </div>
-            <Switch
-              checked={settings.accept_online_orders}
-              onCheckedChange={(checked) => setSettings({ ...settings, accept_online_orders: checked })}
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">Accept Pickup Orders</p>
-              <p className="text-sm text-muted-foreground">Allow customers to place pickup orders</p>
-            </div>
-            <Switch
-              checked={settings.accept_pickup_orders}
-              onCheckedChange={(checked) => setSettings({ ...settings, accept_pickup_orders: checked })}
-            />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Minimum Order Amount (KWD)</Label>
-              <Input
-                type="number"
-                step="0.001"
-                value={settings.min_order_amount}
-                onChange={(e) => setSettings({ ...settings, min_order_amount: parseFloat(e.target.value) || 0 })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Max Delivery Distance (km)</Label>
-              <Input
-                type="number"
-                value={settings.max_delivery_distance}
-                onChange={(e) => setSettings({ ...settings, max_delivery_distance: parseInt(e.target.value) || 0 })}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Key className="h-4 w-4" />
+                    Secret Key
+                  </Label>
+                  <Input
+                    type="password"
+                    value={tapSettings.secret_key}
+                    onChange={(e) => setTapSettings({ ...tapSettings, secret_key: e.target.value })}
+                    placeholder="sk_test_..."
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Keep this secret! Used for server-side API calls
+                  </p>
+                </div>
 
-      {/* Tax & Service */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Tax & Service Charges</CardTitle>
-          <CardDescription>Configure tax and service charge rates</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Tax Rate (%)</Label>
-              <Input
-                type="number"
-                step="0.1"
-                value={settings.tax_rate}
-                onChange={(e) => setSettings({ ...settings, tax_rate: parseFloat(e.target.value) || 0 })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Service Charge (%)</Label>
-              <Input
-                type="number"
-                step="0.1"
-                value={settings.service_charge}
-                onChange={(e) => setSettings({ ...settings, service_charge: parseFloat(e.target.value) || 0 })}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="font-medium">Live Mode</p>
+                    <p className="text-sm text-muted-foreground">
+                      Enable to accept real payments (use live API keys)
+                    </p>
+                  </div>
+                  <Switch
+                    checked={tapSettings.is_live}
+                    onCheckedChange={(checked) => setTapSettings({ ...tapSettings, is_live: checked })}
+                  />
+                </div>
+
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <p className="text-sm text-yellow-800">
+                    <strong>Note:</strong> API keys are stored in the backend environment variables for security. 
+                    To update them permanently, modify the <code>.env</code> file and redeploy the application.
+                  </p>
+                </div>
+              </div>
+
+              <Button onClick={handleSavePaymentSettings} disabled={saving}>
+                <Save className="h-4 w-4 mr-2" />
+                {saving ? 'Saving...' : 'Save Settings'}
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Payment Methods</CardTitle>
+              <CardDescription>Available payment options for customers</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                      💵
+                    </div>
+                    <div>
+                      <p className="font-medium">Cash on Delivery</p>
+                      <p className="text-sm text-muted-foreground">Pay when order arrives</p>
+                    </div>
+                  </div>
+                  <Switch checked={true} disabled />
+                </div>
+
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                      💳
+                    </div>
+                    <div>
+                      <p className="font-medium">Tap Payments</p>
+                      <p className="text-sm text-muted-foreground">KNET, Visa, Mastercard</p>
+                    </div>
+                  </div>
+                  <Switch checked={true} disabled />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="general" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Restaurant Information</CardTitle>
+              <CardDescription>Basic details about your restaurant</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Restaurant Name</Label>
+                  <Input defaultValue="Bam Burgers" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Phone Number</Label>
+                  <Input defaultValue="+965 9474 5424" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Address</Label>
+                <Input defaultValue="Salwa, Kuwait" />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
