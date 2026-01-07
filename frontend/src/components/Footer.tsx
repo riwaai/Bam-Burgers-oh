@@ -29,16 +29,10 @@ const Footer = () => {
             <p className="text-sm opacity-80">
               {t.footer.description}
             </p>
-            <div className="flex gap-4">
-              <a href="#" className="hover:text-primary transition-colors" aria-label="Facebook">
-                <Facebook className="h-5 w-5" />
-              </a>
-              <a href="#" className="hover:text-primary transition-colors" aria-label="Instagram">
+            <div className="flex gap-4">             
+              <a href="https://www.instagram.com/eatbam/" target ="_blank" className="hover:text-primary transition-colors" aria-label="Instagram">
                 <Instagram className="h-5 w-5" />
-              </a>
-              <a href="#" className="hover:text-primary transition-colors" aria-label="Twitter">
-                <Twitter className="h-5 w-5" />
-              </a>
+              </a>             
             </div>
           </div>
 

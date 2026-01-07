@@ -21,7 +21,7 @@ const MenuCard = ({ item }: MenuCardProps) => {
   const isAvailable = item.status === 'active';
 
   // Default image if none provided
-  const imageUrl = item.image_url || 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500';
+  const imageUrl = item.image_url || 'https://png.pngtree.com/png-vector/20191129/ourmid/pngtree-hand-drawn-fast-food-doodle-vector-set-of-fast-food-vector-png-image_2046737.jpg';
 
   const handleClick = () => {
     setShowModal(true);
