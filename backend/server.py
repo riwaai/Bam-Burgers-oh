@@ -324,7 +324,7 @@ async def create_order(request: CreateOrderRequest):
 
 @api_router.get("/orders/{order_id}")
 async def get_order(order_id: str):
-    """Get order by ID"""
+    """Get order by ID with items and modifiers"""
     try:
         orders = await supabase_request('GET', 'orders', params={'id': f'eq.{order_id}', 'select': '*'})
         if not orders:
@@ -332,7 +332,18 @@ async def get_order(order_id: str):
         
         order = orders[0]
         items = await supabase_request('GET', 'order_items', params={'order_id': f'eq.{order_id}', 'select': '*'})
-        order['items'] = items or []
+        
+        # Get modifiers for each item
+        items_with_modifiers = []
+        for item in (items or []):
+            modifiers = await supabase_request('GET', 'order_item_modifiers', params={
+                'order_item_id': f'eq.{item["id"]}',
+                'select': '*'
+            })
+            item['modifiers'] = modifiers or []
+            items_with_modifiers.append(item)
+        
+        order['items'] = items_with_modifiers
         return order
     except HTTPException:
         raise
