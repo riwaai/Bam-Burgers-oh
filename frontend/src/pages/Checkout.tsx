@@ -357,12 +357,12 @@ const Checkout = () => {
                           {t.checkout.cashOnDelivery}
                         </Label>
                       </div>
-                      <div className={`flex items-center space-x-3 p-4 border rounded-lg cursor-pointer hover:bg-muted/50 opacity-50 ${isRTL ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                        <RadioGroupItem value="online" id="online" disabled />
+                      <div className={`flex items-center space-x-3 p-4 border rounded-lg cursor-pointer hover:bg-muted/50 ${paymentMethod === 'online' ? 'border-primary bg-primary/5' : ''} ${isRTL ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                        <RadioGroupItem value="online" id="online" />
                         <Label htmlFor="online" className={`flex items-center gap-2 cursor-pointer flex-1 ${isRTL ? 'flex-row-reverse' : ''}`}>
                           <CreditCard className="h-5 w-5" />
                           {t.checkout.onlinePayment}
-                          <span className="text-xs text-muted-foreground ml-2">(Coming Soon)</span>
+                          <span className="text-xs text-muted-foreground ml-2">(KNET, Visa, Mastercard)</span>
                         </Label>
                       </div>
                     </RadioGroup>
