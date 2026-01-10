@@ -20,9 +20,10 @@ SUPABASE_ANON_KEY = os.environ.get('SUPABASE_ANON_KEY', '')
 TENANT_ID = os.environ.get('TENANT_ID', 'd82147fa-f5e3-474c-bb39-6936ad3b519a')
 BRANCH_ID = os.environ.get('BRANCH_ID', '3f9570b2-24d2-4f2d-81d7-25c6b35da76b')
 
-# Tap Payments configuration
-TAP_SECRET_KEY = os.environ.get('TAP_SECRET_KEY', 'sk_test_gBTwKEqbf34rGwinNdZT0KXz9R7mJ')
-TAP_PUBLIC_KEY = os.environ.get('TAP_PUBLIC_KEY', 'pk_test_gBTwKv0VDeC162iQhAErWglTZ3OsB')
+# Tap Payments configuration - LIVE KEYS
+TAP_SECRET_KEY = os.environ.get('TAP_SECRET_KEY', 'sk_live_gBTwKh2Y0XGztTpcUqKvPOwQHfBiV')
+TAP_PUBLIC_KEY = os.environ.get('TAP_PUBLIC_KEY', 'pk_live_gBTwKm2F0JfNOyR7q4rUslviegVxP')
+TAP_MERCHANT_ID = os.environ.get('TAP_MERCHANT_ID', '68010541')
 
 app = FastAPI(title="Bam Burgers API", version="2.0.0")
 api_router = APIRouter(prefix="/api")
