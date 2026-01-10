@@ -342,17 +342,17 @@ def test_cash_payment_order_creation():
         },
         "items": [
             {
-                "item_id": "550e8400-e29b-41d4-a716-446655440004",
-                "item_name_en": "Test Fries",
-                "item_name_ar": "بطاطس تجريبية",
+                "item_id": "e1111111-1111-1111-1111-111111111111",
+                "item_name_en": "Chicken Strips",
+                "item_name_ar": "شرائح الدجاج",
                 "quantity": 2,
-                "unit_price": 1.5,
-                "total_price": 3.0
+                "unit_price": 1.25,
+                "total_price": 2.50
             }
         ],
-        "subtotal": 3.0,
+        "subtotal": 2.50,
         "delivery_fee": 0.5,
-        "total_amount": 3.5,
+        "total_amount": 3.0,
         "payment_method": "cash"
     }
     
