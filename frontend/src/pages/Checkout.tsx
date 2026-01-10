@@ -113,13 +113,22 @@ const Checkout = () => {
         quantity: item.quantity,
         unit_price: item.price,
         total_price: item.total_price,
-        notes: item.special_instructions || null,
+        notes: item.special_instructions || item.notes || null,
         modifiers: item.modifiers?.map(m => ({
-          id: m.modifier?.id,
-          name: m.modifier?.name,
-          price: m.modifier?.price,
+          id: m.modifier?.id || m.id || '',
+          name_en: m.modifier?.name_en || m.modifier?.name || m.name_en || m.name || '',
+          name_ar: m.modifier?.name_ar || m.name_ar || '',
+          price: m.modifier?.price || m.price || 0,
         })) || [],
       }));
+
+      // Collect all item notes for order notes
+      const itemNotes = items
+        .filter(item => item.special_instructions || item.notes)
+        .map(item => `${item.name}: ${item.special_instructions || item.notes}`)
+        .join('; ');
+      
+      const combinedNotes = [formData.notes, itemNotes].filter(Boolean).join(' | ');
 
       const response = await fetch(`${BACKEND_URL}/api/orders`, {
         method: 'POST',
