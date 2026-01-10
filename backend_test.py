@@ -273,17 +273,17 @@ def test_tap_payment_order_creation():
         },
         "items": [
             {
-                "item_id": "550e8400-e29b-41d4-a716-446655440003",
-                "item_name_en": "Test Burger",
-                "item_name_ar": "برجر تجريبي",
+                "item_id": "cb5db91b-7c76-431a-96df-c53421c82d6a",
+                "item_name_en": "Chicken BAM!",
+                "item_name_ar": "سندويش بام دجاج",
                 "quantity": 1,
-                "unit_price": 2.5,
-                "total_price": 2.5
+                "unit_price": 1.75,
+                "total_price": 1.75
             }
         ],
-        "subtotal": 2.5,
+        "subtotal": 1.75,
         "delivery_fee": 0.5,
-        "total_amount": 3.0,
+        "total_amount": 2.25,
         "payment_method": "tap"
     }
     
