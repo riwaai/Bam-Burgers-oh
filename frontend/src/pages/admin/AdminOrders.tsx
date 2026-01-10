@@ -52,7 +52,7 @@ interface Order {
   customer_name: string;
   customer_phone: string;
   customer_email: string | null;
-  delivery_address: DeliveryAddress | null;
+  delivery_address: DeliveryAddress | string | null;
   delivery_instructions: string | null;
   subtotal: number;
   discount_amount: number;
@@ -62,7 +62,28 @@ interface Order {
   notes: string | null;
   created_at: string;
   items?: OrderItem[];
+  // Payment info
+  payment?: {
+    id: string;
+    transaction_id: string;
+    amount: number;
+    status: string;
+    provider: string;
+  } | null;
 }
+
+// Helper to parse delivery address (can be JSON string or object)
+const parseDeliveryAddress = (addr: DeliveryAddress | string | null): DeliveryAddress | null => {
+  if (!addr) return null;
+  if (typeof addr === 'string') {
+    try {
+      return JSON.parse(addr);
+    } catch {
+      return null;
+    }
+  }
+  return addr;
+};
 
 const adminStatusFlow: OrderStatus[] = ['pending', 'accepted', 'ready'];
 
