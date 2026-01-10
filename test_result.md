@@ -167,9 +167,55 @@ backend:
         - working: true
           agent: "testing"
           comment: "✅ GET /api/loyalty/settings endpoint working correctly. Returns default loyalty settings with 10 points per KWD, active status true."
+  
+  - task: "Payment Verification API"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Implemented GET /api/payment/verify/{charge_ref} endpoint. This verifies payment with Tap API and only creates order if payment is CAPTURED. Returns success: false for unknown refs or failed payments."
+
+  - task: "Tap Payment Flow - Order Creation Only After Payment"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Refactored POST /api/orders to NOT create order when payment_method=tap. Instead, stores order data in pending_payments memory and returns payment_url for Tap redirect. Order only created in DB after payment verification returns CAPTURED status."
 
 frontend:
-  # No frontend testing requested
+  - task: "Checkout - Cart Preservation on Online Payment"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/Checkout.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Fixed Checkout.tsx to NOT clear cart before redirecting to Tap payment. Cart is now only cleared after successful payment verification in PaymentResult.tsx."
+
+  - task: "Payment Result Page - Verification Flow"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/PaymentResult.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "PaymentResult.tsx calls /api/payment/verify/{charge_ref} to verify payment status. Only clears cart on success. Shows failed/cancelled UI with 'Back to Checkout' option if payment fails - cart is preserved."
 
 metadata:
   created_by: "testing_agent"
