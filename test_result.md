@@ -170,27 +170,33 @@ backend:
   
   - task: "Payment Verification API"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: "NA"
           agent: "main"
           comment: "Implemented GET /api/payment/verify/{charge_ref} endpoint. This verifies payment with Tap API and only creates order if payment is CAPTURED. Returns success: false for unknown refs or failed payments."
+        - working: true
+          agent: "testing"
+          comment: "✅ Payment Verification API working correctly. GET /api/payment/verify/{charge_ref} returns proper JSON response with success: false, status: 'not_found' for non-existent charge references. Endpoint accessible and responding as expected."
 
   - task: "Tap Payment Flow - Order Creation Only After Payment"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: "NA"
           agent: "main"
           comment: "Refactored POST /api/orders to NOT create order when payment_method=tap. Instead, stores order data in pending_payments memory and returns payment_url for Tap redirect. Order only created in DB after payment verification returns CAPTURED status."
+        - working: true
+          agent: "testing"
+          comment: "✅ Tap Payment Flow working correctly. POST /api/orders with payment_method='tap' returns requires_payment: true, valid payment_url (https://checkout.tap.company), and empty order_number (order not created yet). Cash payments create orders immediately with proper order_id and order_number. Admin orders endpoint includes payment info when available."
 
 frontend:
   - task: "Checkout - Cart Preservation on Online Payment"
