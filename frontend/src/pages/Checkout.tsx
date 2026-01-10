@@ -157,13 +157,14 @@ const Checkout = () => {
 
       const orderResult = await response.json();
       
-      // If Tap payment, redirect to payment page
+      // If Tap payment, redirect to payment page (DON'T clear cart yet - only clear after payment verified)
       if (paymentMethod === 'online' && orderResult.payment_url) {
-        clearCart();
+        // Cart will be cleared after successful payment verification in PaymentResult page
         window.location.href = orderResult.payment_url;
         return;
       }
       
+      // For cash orders, clear cart and show success
       toast.success(isRTL ? 'تم تقديم الطلب بنجاح!' : 'Order placed successfully!');
       clearCart();
       navigate(`/track-order/${orderResult.id}?order_number=${orderResult.order_number}`);
