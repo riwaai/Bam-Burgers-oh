@@ -342,7 +342,7 @@ def test_cash_payment_order_creation():
         },
         "items": [
             {
-                "item_id": "test-fries-id",
+                "item_id": "550e8400-e29b-41d4-a716-446655440004",
                 "item_name_en": "Test Fries",
                 "item_name_ar": "بطاطس تجريبية",
                 "quantity": 2,
