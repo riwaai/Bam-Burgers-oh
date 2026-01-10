@@ -68,7 +68,7 @@ def test_order_creation():
         "delivery_instructions": "Call when you arrive",
         "items": [
             {
-                "item_id": "burger_001",
+                "item_id": "550e8400-e29b-41d4-a716-446655440001",
                 "item_name_en": "Classic Beef Burger",
                 "item_name_ar": "برجر لحم كلاسيكي",
                 "quantity": 2,
@@ -78,7 +78,7 @@ def test_order_creation():
                 "modifiers": []
             },
             {
-                "item_id": "fries_001", 
+                "item_id": "550e8400-e29b-41d4-a716-446655440002", 
                 "item_name_en": "French Fries",
                 "item_name_ar": "بطاطس مقلية",
                 "quantity": 1,
