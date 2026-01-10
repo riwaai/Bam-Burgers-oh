@@ -262,19 +262,39 @@ async def create_order(request: CreateOrderRequest):
         
         # Insert order items
         if request.items:
-            items_data = [{
-                'order_id': order_id,
-                'item_id': item.item_id,
-                'item_name_en': item.item_name_en,
-                'item_name_ar': item.item_name_ar,
-                'quantity': item.quantity,
-                'unit_price': item.unit_price,
-                'total_price': item.total_price,
-                'notes': item.notes,
-                'status': 'pending',
-            } for item in request.items]
-            
-            await supabase_request('POST', 'order_items', data=items_data)
+            for item in request.items:
+                order_item_id = str(uuid.uuid4())
+                
+                # Insert order item
+                item_data = {
+                    'id': order_item_id,
+                    'order_id': order_id,
+                    'item_id': item.item_id,
+                    'item_name_en': item.item_name_en,
+                    'item_name_ar': item.item_name_ar,
+                    'quantity': item.quantity,
+                    'unit_price': item.unit_price,
+                    'total_price': item.total_price,
+                    'notes': item.notes,
+                    'status': 'pending',
+                }
+                await supabase_request('POST', 'order_items', data=item_data)
+                
+                # Insert item modifiers if any
+                if item.modifiers:
+                    for mod in item.modifiers:
+                        modifier_data = {
+                            'order_item_id': order_item_id,
+                            'modifier_id': mod.id if hasattr(mod, 'id') else mod.get('id', ''),
+                            'modifier_name_en': mod.name_en if hasattr(mod, 'name_en') else mod.get('name_en', mod.get('name', '')),
+                            'modifier_name_ar': mod.name_ar if hasattr(mod, 'name_ar') else mod.get('name_ar', ''),
+                            'quantity': 1,
+                            'price': mod.price if hasattr(mod, 'price') else mod.get('price', 0),
+                        }
+                        try:
+                            await supabase_request('POST', 'order_item_modifiers', data=modifier_data)
+                        except Exception as mod_err:
+                            logging.warning(f"Could not save modifier: {mod_err}")
         
         # Handle Tap payment if selected
         payment_url = None
