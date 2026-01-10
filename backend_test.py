@@ -273,7 +273,7 @@ def test_tap_payment_order_creation():
         },
         "items": [
             {
-                "item_id": "test-burger-id",
+                "item_id": "550e8400-e29b-41d4-a716-446655440003",
                 "item_name_en": "Test Burger",
                 "item_name_ar": "برجر تجريبي",
                 "quantity": 1,
