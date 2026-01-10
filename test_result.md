@@ -220,16 +220,13 @@ frontend:
 metadata:
   created_by: "testing_agent"
   version: "1.0"
-  test_sequence: 1
+  test_sequence: 2
   run_ui: false
 
 test_plan:
   current_focus:
-    - "Order Creation API"
-    - "Order Status Update API"
-    - "Admin Orders Retrieval API"
-    - "Coupon Validation API"
-    - "Loyalty Settings API"
+    - "Payment Verification API"
+    - "Tap Payment Flow - Order Creation Only After Payment"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -237,3 +234,5 @@ test_plan:
 agent_communication:
     - agent: "testing"
       message: "Completed comprehensive backend API testing for Bam Burgers. All 5 endpoints now working correctly after fixing UUID format issue in backend .env file. Order creation uses MongoDB fallback, status updates work properly, admin orders return full list, coupon validation works with built-in codes, and loyalty settings return defaults. Backend API is fully functional."
+    - agent: "main"
+      message: "Fixed the payment flow. Key changes: 1) Fixed FRONTEND_URL in backend .env to use correct preview URL for Tap redirects. 2) Fixed TENANT_ID and BRANCH_ID to use correct UUIDs. 3) Changed Checkout.tsx to NOT clear cart before Tap redirect - cart persists in localStorage. 4) PaymentResult.tsx verifies payment via /api/payment/verify/{ref} and only clears cart on success. Please test the Payment Verification API endpoint to verify it returns correct responses."
