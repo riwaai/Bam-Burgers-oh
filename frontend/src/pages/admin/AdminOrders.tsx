@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, BellOff, Printer, Check, ChefHat, Package, Truck, Eye, X, RefreshCw, Ban } from 'lucide-react';
+import { Bell, BellOff, Printer, Check, ChefHat, Package, Truck, Eye, X, RefreshCw, Ban, MapPin, Phone, Mail, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,14 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.REACT_AP
 
 type OrderStatus = 'pending' | 'accepted' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'completed' | 'cancelled';
 
+interface OrderItemModifier {
+  id: string;
+  modifier_name_en: string;
+  modifier_name_ar?: string;
+  price: number;
+  quantity: number;
+}
+
 interface OrderItem {
   id: string;
   item_name_en: string;
@@ -20,6 +28,19 @@ interface OrderItem {
   unit_price: number;
   total_price: number;
   notes?: string;
+  modifiers?: OrderItemModifier[];
+}
+
+interface DeliveryAddress {
+  area?: string;
+  block?: string;
+  street?: string;
+  building?: string;
+  floor?: string;
+  apartment?: string;
+  additional_directions?: string;
+  geo_lat?: number;
+  geo_lng?: number;
 }
 
 interface Order {
@@ -31,7 +52,7 @@ interface Order {
   customer_name: string;
   customer_phone: string;
   customer_email: string | null;
-  delivery_address: any;
+  delivery_address: DeliveryAddress | null;
   delivery_instructions: string | null;
   subtotal: number;
   discount_amount: number;
@@ -95,7 +116,6 @@ const AdminOrders = () => {
   useEffect(() => {
     fetchOrders();
     
-    // Subscribe to realtime updates
     const channel = supabase
       .channel('orders-realtime')
       .on('postgres_changes', { 
@@ -106,7 +126,6 @@ const AdminOrders = () => {
       }, () => fetchOrders())
       .subscribe();
     
-    // Also poll every 15 seconds as backup
     const pollInterval = setInterval(fetchOrders, 15000);
     
     return () => {
@@ -137,7 +156,6 @@ const AdminOrders = () => {
 
   const fetchOrders = async () => {
     try {
-      // Fetch from Supabase directly
       const { data: ordersData, error } = await supabase
         .from('orders')
         .select('*')
@@ -147,14 +165,26 @@ const AdminOrders = () => {
       
       if (error) throw error;
       
-      // Fetch items for each order
+      // Fetch items and modifiers for each order
       const ordersWithItems = await Promise.all(
         (ordersData || []).map(async (order) => {
           const { data: items } = await supabase
             .from('order_items')
             .select('*')
             .eq('order_id', order.id);
-          return { ...order, items: items || [] };
+          
+          // Fetch modifiers for each item
+          const itemsWithModifiers = await Promise.all(
+            (items || []).map(async (item) => {
+              const { data: modifiers } = await supabase
+                .from('order_item_modifiers')
+                .select('*')
+                .eq('order_item_id', item.id);
+              return { ...item, modifiers: modifiers || [] };
+            })
+          );
+          
+          return { ...order, items: itemsWithModifiers };
         })
       );
       
@@ -170,7 +200,6 @@ const AdminOrders = () => {
   const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     setUpdatingStatus(orderId);
     try {
-      // Update via backend API (which uses Supabase)
       const response = await fetch(`${BACKEND_URL}/api/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -184,13 +213,11 @@ const AdminOrders = () => {
       
       toast.success(`Status updated to ${statusConfig[newStatus].label}`);
       
-      // Update local state immediately
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
       if (selectedOrder?.id === orderId) {
         setSelectedOrder(prev => prev ? { ...prev, status: newStatus } : null);
       }
       
-      // Refresh from server
       fetchOrders();
     } catch (err: any) {
       console.error('Error:', err);
@@ -205,16 +232,27 @@ const AdminOrders = () => {
     return idx >= 0 && idx < adminStatusFlow.length - 1 ? adminStatusFlow[idx + 1] : null;
   };
 
-  const formatAddress = (addr: any) => {
-    if (!addr) return 'N/A';
-    return [
-      addr.area, 
-      addr.block && `Block ${addr.block}`, 
-      addr.street, 
-      addr.building && `Bldg ${addr.building}`, 
-      addr.floor && `Floor ${addr.floor}`, 
-      addr.apartment && `Apt ${addr.apartment}`
-    ].filter(Boolean).join(', ') || 'N/A';
+  // Format full delivery address
+  const formatFullAddress = (addr: DeliveryAddress | null): string[] => {
+    if (!addr) return [];
+    
+    const lines: string[] = [];
+    
+    if (addr.area) lines.push(`Area: ${addr.area}`);
+    if (addr.block) lines.push(`Block: ${addr.block}`);
+    if (addr.street) lines.push(`Street: ${addr.street}`);
+    if (addr.building) lines.push(`Building: ${addr.building}`);
+    if (addr.floor) lines.push(`Floor: ${addr.floor}`);
+    if (addr.apartment) lines.push(`Apartment: ${addr.apartment}`);
+    if (addr.additional_directions) lines.push(`Directions: ${addr.additional_directions}`);
+    
+    return lines;
+  };
+
+  const formatShortAddress = (addr: DeliveryAddress | null): string => {
+    if (!addr) return 'No address';
+    const parts = [addr.area, addr.block && `Blk ${addr.block}`, addr.building && `Bldg ${addr.building}`].filter(Boolean);
+    return parts.join(', ') || 'No address';
   };
 
   const formatDate = (d: string) => {
@@ -260,6 +298,12 @@ const AdminOrders = () => {
 
   const filteredOrders = statusFilter === 'all' ? orders : orders.filter(o => o.status === statusFilter);
   const pendingCount = orders.filter(o => o.status === 'pending').length;
+
+  // Calculate total items including modifiers price
+  const getItemTotalWithModifiers = (item: OrderItem): number => {
+    const modifiersTotal = (item.modifiers || []).reduce((sum, mod) => sum + (mod.price * (mod.quantity || 1)), 0);
+    return item.total_price + (modifiersTotal * item.quantity);
+  };
 
   return (
     <div className="space-y-6">
@@ -341,26 +385,53 @@ const AdminOrders = () => {
                     <p className="font-medium">{order.customer_name || 'Guest'}</p>
                     <p className="text-sm text-muted-foreground">{order.customer_phone || 'No phone'}</p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <Badge variant="outline">{order.order_type === 'pickup' ? 'Pickup' : 'Delivery'}</Badge>
                     {order.payment_status === 'paid' && (
                       <Badge className="bg-green-500 text-white">Paid</Badge>
                     )}
                   </div>
+                  
+                  {/* Show short address for delivery orders */}
+                  {order.order_type === 'delivery' && order.delivery_address && (
+                    <p className="text-sm text-muted-foreground flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      {formatShortAddress(order.delivery_address)}
+                    </p>
+                  )}
+                  
+                  {/* Show items preview */}
                   {order.items && order.items.length > 0 && (
                     <div className="text-sm text-muted-foreground">
                       {order.items.slice(0, 2).map((item, i) => (
-                        <p key={i}>{item.quantity}x {item.item_name_en}</p>
+                        <div key={i}>
+                          <p>{item.quantity}x {item.item_name_en}</p>
+                          {item.modifiers && item.modifiers.length > 0 && (
+                            <p className="text-xs text-orange-600 ml-2">
+                              + {item.modifiers.map(m => m.modifier_name_en).join(', ')}
+                            </p>
+                          )}
+                        </div>
                       ))}
                       {order.items.length > 2 && <p className="text-primary">+{order.items.length - 2} more</p>}
                     </div>
                   )}
+                  
+                  {/* Show notes preview */}
+                  {order.notes && (
+                    <p className="text-xs text-orange-600 flex items-center gap-1">
+                      <FileText className="h-3 w-3" />
+                      {order.notes.substring(0, 50)}{order.notes.length > 50 ? '...' : ''}
+                    </p>
+                  )}
+                  
                   <div className="flex items-center justify-between pt-2 border-t">
                     <span className="text-lg font-bold">{(order.total_amount || 0).toFixed(3)} KWD</span>
                     <Button size="sm" variant="outline" onClick={() => { setSelectedOrder(order); setShowReceipt(false); }}>
                       <Eye className="h-4 w-4" />
                     </Button>
                   </div>
+                  
                   {order.status !== 'cancelled' && order.status !== 'delivered' && order.status !== 'completed' && order.status !== 'ready' && (
                     <div className="flex gap-2 pt-2">
                       {next && (
@@ -401,39 +472,105 @@ const AdminOrders = () => {
               <DialogHeader>
                 <DialogTitle className="flex items-center justify-between">
                   <span>Order #{selectedOrder.order_number}</span>
-                  <Badge className={`${statusConfig[selectedOrder.status]?.bgColor || 'bg-gray-500'} text-white`}>
-                    {statusConfig[selectedOrder.status]?.label}
-                  </Badge>
+                  <div className="flex gap-2">
+                    {selectedOrder.payment_status === 'paid' && (
+                      <Badge className="bg-green-500 text-white">Paid Online</Badge>
+                    )}
+                    <Badge className={`${statusConfig[selectedOrder.status]?.bgColor || 'bg-gray-500'} text-white`}>
+                      {statusConfig[selectedOrder.status]?.label}
+                    </Badge>
+                  </div>
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
+                {/* Customer Information */}
                 <div className="bg-gray-50 p-4 rounded-lg">
-                  <h3 className="font-semibold mb-2">Customer</h3>
-                  <p>{selectedOrder.customer_name || 'Guest'} • {selectedOrder.customer_phone || 'N/A'}</p>
-                  {selectedOrder.customer_email && <p className="text-sm text-muted-foreground">{selectedOrder.customer_email}</p>}
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    <Phone className="h-4 w-4" /> Customer Information
+                  </h3>
+                  <div className="space-y-1 text-sm">
+                    <p><strong>Name:</strong> {selectedOrder.customer_name || 'Guest'}</p>
+                    <p><strong>Phone:</strong> {selectedOrder.customer_phone || 'Not provided'}</p>
+                    {selectedOrder.customer_email && (
+                      <p><strong>Email:</strong> {selectedOrder.customer_email}</p>
+                    )}
+                  </div>
                 </div>
                 
-                {selectedOrder.order_type === 'delivery' && selectedOrder.delivery_address && (
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="font-semibold mb-2">Delivery Address</h3>
-                    <p className="text-sm">{formatAddress(selectedOrder.delivery_address)}</p>
+                {/* Delivery Address - Full Details */}
+                {selectedOrder.order_type === 'delivery' && (
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h3 className="font-semibold mb-3 flex items-center gap-2">
+                      <MapPin className="h-4 w-4" /> Delivery Address
+                    </h3>
+                    {selectedOrder.delivery_address ? (
+                      <div className="space-y-1 text-sm">
+                        {formatFullAddress(selectedOrder.delivery_address).map((line, i) => (
+                          <p key={i}>{line}</p>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No address provided</p>
+                    )}
                     {selectedOrder.delivery_instructions && (
-                      <p className="text-sm text-muted-foreground mt-1">Note: {selectedOrder.delivery_instructions}</p>
+                      <div className="mt-3 pt-3 border-t border-blue-200">
+                        <p className="text-sm"><strong>Delivery Instructions:</strong></p>
+                        <p className="text-sm text-blue-700">{selectedOrder.delivery_instructions}</p>
+                      </div>
                     )}
                   </div>
                 )}
                 
+                {/* Order Notes */}
+                {selectedOrder.notes && (
+                  <div className="bg-orange-50 p-4 rounded-lg">
+                    <h3 className="font-semibold mb-2 flex items-center gap-2">
+                      <FileText className="h-4 w-4" /> Order Notes
+                    </h3>
+                    <p className="text-sm text-orange-800">{selectedOrder.notes}</p>
+                  </div>
+                )}
+                
+                {/* Order Items with Modifiers */}
                 <div>
-                  <h3 className="font-semibold mb-2">Items</h3>
-                  {selectedOrder.items?.map((item, i) => (
-                    <div key={i} className="flex justify-between p-2 bg-gray-50 rounded mb-1">
-                      <span>{item.quantity}x {item.item_name_en}</span>
-                      <span>{(item.total_price || 0).toFixed(3)} KWD</span>
-                    </div>
-                  ))}
+                  <h3 className="font-semibold mb-3">Order Items</h3>
+                  <div className="space-y-3">
+                    {selectedOrder.items?.map((item, i) => (
+                      <div key={i} className="p-3 bg-gray-50 rounded-lg">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <p className="font-medium">{item.quantity}x {item.item_name_en}</p>
+                            {item.item_name_ar && (
+                              <p className="text-sm text-muted-foreground" dir="rtl">{item.item_name_ar}</p>
+                            )}
+                          </div>
+                          <span className="font-medium">{(item.total_price || 0).toFixed(3)} KWD</span>
+                        </div>
+                        
+                        {/* Item Modifiers/Add-ons */}
+                        {item.modifiers && item.modifiers.length > 0 && (
+                          <div className="mt-2 pl-4 border-l-2 border-orange-300">
+                            <p className="text-xs font-medium text-orange-700 mb-1">Add-ons:</p>
+                            {item.modifiers.map((mod, j) => (
+                              <div key={j} className="flex justify-between text-sm text-orange-600">
+                                <span>+ {mod.modifier_name_en}</span>
+                                {mod.price > 0 && <span>+{mod.price.toFixed(3)} KWD</span>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {/* Item Notes */}
+                        {item.notes && (
+                          <p className="mt-2 text-sm text-orange-600 italic">Note: {item.notes}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 
-                <div className="border-t pt-4 space-y-1">
+                {/* Order Totals */}
+                <div className="border-t pt-4 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Subtotal</span>
                     <span>{(selectedOrder.subtotal || 0).toFixed(3)} KWD</span>
@@ -452,10 +589,11 @@ const AdminOrders = () => {
                   )}
                   <div className="flex justify-between font-bold text-lg pt-2 border-t">
                     <span>Total</span>
-                    <span>{(selectedOrder.total_amount || 0).toFixed(3)} KWD</span>
+                    <span className="text-primary">{(selectedOrder.total_amount || 0).toFixed(3)} KWD</span>
                   </div>
                 </div>
                 
+                {/* Status Update */}
                 {selectedOrder.status !== 'cancelled' && selectedOrder.status !== 'delivered' && selectedOrder.status !== 'completed' && selectedOrder.status !== 'ready' && (
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <h3 className="font-semibold mb-2">Update Status</h3>
