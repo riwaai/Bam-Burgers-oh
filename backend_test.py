@@ -218,6 +218,206 @@ def test_loyalty_settings():
         print(f"❌ Loyalty settings retrieval failed: {result}")
         return False
 
+def test_payment_verification():
+    """Test 6: Payment Verification API - GET /api/payment/verify/{charge_ref}"""
+    print("\n" + "="*50)
+    print("TEST 6: Payment Verification API")
+    print("="*50)
+    
+    # Test with a non-existent charge_ref (should return success: false, status: "not_found")
+    fake_charge_ref = "non-existent-charge-ref-12345"
+    
+    success, result = test_api_endpoint("GET", f"/payment/verify/{fake_charge_ref}", expected_status=200)
+    
+    if success:
+        print("✅ Payment verification endpoint accessible")
+        if isinstance(result, dict):
+            success_flag = result.get('success')
+            status = result.get('status')
+            message = result.get('message')
+            print(f"Success: {success_flag}")
+            print(f"Status: {status}")
+            print(f"Message: {message}")
+            
+            # Should return success: false and status: "not_found" for non-existent ref
+            if success_flag == False and status == "not_found":
+                print("✅ Correct response for non-existent charge reference")
+                return True
+            else:
+                print("❌ Unexpected response format or values")
+                return False
+        else:
+            print("❌ Invalid response format")
+            return False
+    else:
+        print(f"❌ Payment verification failed: {result}")
+        return False
+
+def test_tap_payment_order_creation():
+    """Test 7: Order Creation with Tap Payment - POST /api/orders"""
+    print("\n" + "="*50)
+    print("TEST 7: Tap Payment Order Creation")
+    print("="*50)
+    
+    # Create order data with tap payment method
+    order_data = {
+        "order_type": "delivery",
+        "customer_name": "Fatima Al-Zahra",
+        "customer_phone": "+96599999999",
+        "customer_email": "fatima@test.com",
+        "delivery_address": {
+            "area": "Salmiya",
+            "block": "5",
+            "street": "Test Street",
+            "building": "10"
+        },
+        "items": [
+            {
+                "item_id": "test-burger-id",
+                "item_name_en": "Test Burger",
+                "item_name_ar": "برجر تجريبي",
+                "quantity": 1,
+                "unit_price": 2.5,
+                "total_price": 2.5
+            }
+        ],
+        "subtotal": 2.5,
+        "delivery_fee": 0.5,
+        "total_amount": 3.0,
+        "payment_method": "tap"
+    }
+    
+    success, result = test_api_endpoint("POST", "/orders", data=order_data, expected_status=200)
+    
+    if success:
+        print("✅ Tap payment order creation successful")
+        if isinstance(result, dict):
+            requires_payment = result.get('requires_payment')
+            payment_url = result.get('payment_url')
+            order_number = result.get('order_number')
+            order_id = result.get('id')
+            
+            print(f"Requires Payment: {requires_payment}")
+            print(f"Payment URL: {payment_url}")
+            print(f"Order Number: {order_number}")
+            print(f"Order ID: {order_id}")
+            
+            # Should return requires_payment: true and payment_url starting with https://goSellJSLib
+            if requires_payment == True and payment_url and payment_url.startswith('https://'):
+                print("✅ Correct tap payment response - requires payment and has payment URL")
+                # Order number should be empty since order isn't created yet
+                if not order_number or order_number == "":
+                    print("✅ Order number correctly empty (order not created yet)")
+                    return True, order_id  # Return the charge_ref for potential verification
+                else:
+                    print("❌ Order number should be empty for tap payment before verification")
+                    return False, None
+            else:
+                print("❌ Missing required payment fields or incorrect values")
+                return False, None
+        else:
+            print("❌ Invalid response format")
+            return False, None
+    else:
+        print(f"❌ Tap payment order creation failed: {result}")
+        return False, None
+
+def test_cash_payment_order_creation():
+    """Test 8: Order Creation with Cash Payment - POST /api/orders"""
+    print("\n" + "="*50)
+    print("TEST 8: Cash Payment Order Creation")
+    print("="*50)
+    
+    # Create order data with cash payment method
+    order_data = {
+        "order_type": "delivery",
+        "customer_name": "Omar Al-Mansouri",
+        "customer_phone": "+96599888777",
+        "customer_email": "omar@test.com",
+        "delivery_address": {
+            "area": "Hawalli",
+            "block": "3",
+            "street": "Main Street",
+            "building": "25"
+        },
+        "items": [
+            {
+                "item_id": "test-fries-id",
+                "item_name_en": "Test Fries",
+                "item_name_ar": "بطاطس تجريبية",
+                "quantity": 2,
+                "unit_price": 1.5,
+                "total_price": 3.0
+            }
+        ],
+        "subtotal": 3.0,
+        "delivery_fee": 0.5,
+        "total_amount": 3.5,
+        "payment_method": "cash"
+    }
+    
+    success, result = test_api_endpoint("POST", "/orders", data=order_data, expected_status=200)
+    
+    if success:
+        print("✅ Cash payment order creation successful")
+        if isinstance(result, dict):
+            requires_payment = result.get('requires_payment')
+            order_number = result.get('order_number')
+            order_id = result.get('id')
+            
+            print(f"Requires Payment: {requires_payment}")
+            print(f"Order Number: {order_number}")
+            print(f"Order ID: {order_id}")
+            
+            # Should immediately create order with order_number and order_id
+            if requires_payment == False and order_number and order_id:
+                print("✅ Correct cash payment response - order created immediately")
+                return True, order_id
+            else:
+                print("❌ Missing order details or incorrect payment requirement")
+                return False, None
+        else:
+            print("❌ Invalid response format")
+            return False, None
+    else:
+        print(f"❌ Cash payment order creation failed: {result}")
+        return False, None
+
+def test_admin_orders_with_payment_info():
+    """Test 9: Admin Orders with Payment Info - GET /api/admin/orders"""
+    print("\n" + "="*50)
+    print("TEST 9: Admin Orders with Payment Info")
+    print("="*50)
+    
+    success, result = test_api_endpoint("GET", "/admin/orders", expected_status=200)
+    
+    if success:
+        print("✅ Admin orders retrieval successful")
+        if isinstance(result, list):
+            print(f"Number of orders returned: {len(result)}")
+            if len(result) > 0:
+                sample_order = result[0]
+                print(f"Sample order number: {sample_order.get('order_number', 'N/A')}")
+                print(f"Sample order payment status: {sample_order.get('payment_status', 'N/A')}")
+                
+                # Check if payment info is included when available
+                payment_info = sample_order.get('payment')
+                if payment_info:
+                    print(f"Payment info included: {payment_info.get('provider', 'N/A')}")
+                else:
+                    print("No payment info in sample order (may be cash order)")
+                
+                return True
+            else:
+                print("✅ No orders found (empty list is valid)")
+                return True
+        else:
+            print("❌ Expected array of orders")
+            return False
+    else:
+        print(f"❌ Admin orders retrieval failed: {result}")
+        return False
+
 def main():
     """Run all backend API tests"""
     print("Bam Burgers Backend API Test Suite")
