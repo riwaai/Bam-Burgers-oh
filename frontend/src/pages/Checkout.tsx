@@ -145,7 +145,7 @@ const Checkout = () => {
           discount_amount: discount,
           delivery_fee: deliveryFee,
           total_amount: orderTotal,
-          notes: formData.notes || undefined,
+          notes: combinedNotes || undefined,
           payment_method: paymentMethod === 'online' ? 'tap' : 'cash',
         }),
       });
