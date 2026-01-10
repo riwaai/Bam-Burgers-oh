@@ -52,7 +52,7 @@ const Index = () => {
               className="h-20 md:h-28 w-auto mb-4"
             />
             <h1 className="text-4xl md:text-6xl font-bold text-white leading-tight">
-              <span className="text-primary">OG BURGER MEAL</span>
+              <span className="text-primary">THE PEOPLE'S SANDWICH</span>
             </h1>
             <p className="text-lg md:text-xl text-white/80 max-w-lg">
               {t.hero.subtitle}
