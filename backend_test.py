@@ -426,9 +426,9 @@ def main():
     
     results = []
     
-    # Test 1: Order Creation
+    # Test 1: Order Creation (Cash - for baseline)
     order_id, order_number = test_order_creation()
-    results.append(("Order Creation", order_id is not None))
+    results.append(("Order Creation (Cash)", order_id is not None))
     
     # Test 2: Order Status Update (requires order_id from test 1)
     status_update_success = test_order_status_update(order_id)
@@ -446,6 +446,27 @@ def main():
     loyalty_success = test_loyalty_settings()
     results.append(("Loyalty Settings", loyalty_success))
     
+    # NEW PAYMENT TESTS - Focus of this testing session
+    print("\n" + "🔥"*20)
+    print("PAYMENT VERIFICATION FLOW TESTS")
+    print("🔥"*20)
+    
+    # Test 6: Payment Verification API
+    payment_verification_success = test_payment_verification()
+    results.append(("Payment Verification API", payment_verification_success))
+    
+    # Test 7: Tap Payment Order Creation
+    tap_order_success, charge_ref = test_tap_payment_order_creation()
+    results.append(("Tap Payment Order Creation", tap_order_success))
+    
+    # Test 8: Cash Payment Order Creation
+    cash_order_success, cash_order_id = test_cash_payment_order_creation()
+    results.append(("Cash Payment Order Creation", cash_order_success))
+    
+    # Test 9: Admin Orders with Payment Info
+    admin_payment_info_success = test_admin_orders_with_payment_info()
+    results.append(("Admin Orders with Payment Info", admin_payment_info_success))
+    
     # Summary
     print("\n" + "="*50)
     print("TEST SUMMARY")
@@ -461,6 +482,13 @@ def main():
             passed += 1
     
     print(f"\nOverall: {passed}/{total} tests passed")
+    
+    # Focus on payment tests
+    payment_tests = results[5:]  # Last 4 tests are payment-related
+    payment_passed = sum(1 for _, success in payment_tests if success)
+    payment_total = len(payment_tests)
+    
+    print(f"Payment Flow Tests: {payment_passed}/{payment_total} passed")
     
     if passed == total:
         print("🎉 All tests passed!")
