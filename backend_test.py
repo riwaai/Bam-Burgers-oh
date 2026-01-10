@@ -68,30 +68,30 @@ def test_order_creation():
         "delivery_instructions": "Call when you arrive",
         "items": [
             {
-                "item_id": "550e8400-e29b-41d4-a716-446655440001",
-                "item_name_en": "Classic Beef Burger",
-                "item_name_ar": "برجر لحم كلاسيكي",
+                "item_id": "c2222222-2222-2222-2222-222222222222",
+                "item_name_en": "Cheese Burger",
+                "item_name_ar": "تشيز برجر",
                 "quantity": 2,
-                "unit_price": 3.5,
-                "total_price": 7.0,
+                "unit_price": 1.85,
+                "total_price": 3.70,
                 "notes": "No onions",
                 "modifiers": []
             },
             {
-                "item_id": "550e8400-e29b-41d4-a716-446655440002", 
-                "item_name_en": "French Fries",
-                "item_name_ar": "بطاطس مقلية",
+                "item_id": "e5555555-5555-5555-5555-555555555555", 
+                "item_name_en": "Regular Fries",
+                "item_name_ar": "بطاطس عادية متوسطة",
                 "quantity": 1,
-                "unit_price": 1.5,
-                "total_price": 1.5,
+                "unit_price": 0.95,
+                "total_price": 0.95,
                 "notes": "",
                 "modifiers": []
             }
         ],
-        "subtotal": 8.5,
+        "subtotal": 4.65,
         "discount_amount": 0,
         "delivery_fee": 1.0,
-        "total_amount": 9.5,
+        "total_amount": 5.65,
         "notes": "Please prepare fresh",
         "coupon_code": None
     }
