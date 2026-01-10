@@ -4,11 +4,12 @@ from starlette.middleware.cors import CORSMiddleware
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import List, Optional
 import uuid
 from datetime import datetime
 import httpx
+import json
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -38,6 +39,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# In-memory store for pending payments (in production, use Redis or database)
+pending_payments = {}
 
 
 # ==================== MODELS ====================
@@ -91,6 +95,7 @@ class OrderResponse(BaseModel):
     status: str
     created_at: str
     payment_url: Optional[str] = None
+    requires_payment: bool = False
 
 class UpdateStatusRequest(BaseModel):
     status: str
@@ -159,20 +164,6 @@ class ItemModifierGroupLink(BaseModel):
     modifier_group_id: str
     sort_order: int = 0
 
-class TapChargeRequest(BaseModel):
-    order_id: str
-    amount: float
-    currency: str = "KWD"
-    customer_name: str
-    customer_email: Optional[str] = None
-    customer_phone: str
-    description: Optional[str] = None
-    redirect_url: str
-
-class AdminSettingsUpdate(BaseModel):
-    tap_secret_key: Optional[str] = None
-    tap_public_key: Optional[str] = None
-
 
 # ==================== SUPABASE HELPER ====================
 
@@ -225,96 +216,192 @@ async def api_health_check():
 
 # ==================== ORDERS ====================
 
+async def create_order_in_db(request: CreateOrderRequest, payment_status: str = 'pending', transaction_id: str = None) -> dict:
+    """Create order in Supabase database"""
+    order_number = generate_order_number()
+    order_id = str(uuid.uuid4())
+    
+    address_json = request.delivery_address.dict() if request.delivery_address else None
+    
+    order_data = {
+        'id': order_id,
+        'tenant_id': TENANT_ID,
+        'branch_id': BRANCH_ID,
+        'order_number': order_number,
+        'order_type': request.order_type,
+        'channel': 'website',
+        'status': 'pending',
+        'customer_name': request.customer_name,
+        'customer_phone': request.customer_phone,
+        'customer_email': request.customer_email,
+        'delivery_address': address_json,
+        'delivery_instructions': request.delivery_instructions,
+        'subtotal': request.subtotal,
+        'discount_amount': request.discount_amount,
+        'delivery_fee': request.delivery_fee,
+        'tax_amount': 0,
+        'service_charge': 0,
+        'total_amount': request.total_amount,
+        'payment_status': payment_status,
+        'notes': request.notes,
+    }
+    
+    # Insert order
+    await supabase_request('POST', 'orders', data=order_data)
+    
+    # Insert order items
+    if request.items:
+        for item in request.items:
+            order_item_id = str(uuid.uuid4())
+            
+            item_data = {
+                'id': order_item_id,
+                'order_id': order_id,
+                'item_id': item.item_id,
+                'item_name_en': item.item_name_en,
+                'item_name_ar': item.item_name_ar,
+                'quantity': item.quantity,
+                'unit_price': item.unit_price,
+                'total_price': item.total_price,
+                'notes': item.notes,
+                'status': 'pending',
+            }
+            await supabase_request('POST', 'order_items', data=item_data)
+            
+            # Insert item modifiers
+            if item.modifiers:
+                for mod in item.modifiers:
+                    modifier_data = {
+                        'order_item_id': order_item_id,
+                        'modifier_id': mod.id if hasattr(mod, 'id') else mod.get('id', ''),
+                        'modifier_name_en': mod.name_en if hasattr(mod, 'name_en') else mod.get('name_en', ''),
+                        'modifier_name_ar': mod.name_ar if hasattr(mod, 'name_ar') else mod.get('name_ar', ''),
+                        'quantity': 1,
+                        'price': mod.price if hasattr(mod, 'price') else mod.get('price', 0),
+                    }
+                    try:
+                        await supabase_request('POST', 'order_item_modifiers', data=modifier_data)
+                    except Exception as e:
+                        logging.warning(f"Could not save modifier: {e}")
+    
+    # Create payment record if online payment
+    if payment_status == 'paid' and transaction_id:
+        payment_data = {
+            'id': str(uuid.uuid4()),
+            'order_id': order_id,
+            'payment_method': 'online',
+            'provider': 'tap',
+            'amount': request.total_amount,
+            'currency': 'KWD',
+            'status': 'completed',
+            'transaction_id': transaction_id,
+        }
+        await supabase_request('POST', 'payments', data=payment_data)
+    
+    return {
+        'id': order_id,
+        'order_number': order_number,
+        'status': 'pending',
+        'created_at': datetime.utcnow().isoformat(),
+    }
+
+
 @api_router.post("/orders", response_model=OrderResponse)
 async def create_order(request: CreateOrderRequest):
-    """Create a new order in Supabase"""
+    """Create a new order - for cash orders, creates immediately. For online payment, initiates payment first."""
     try:
-        order_number = generate_order_number()
-        order_id = str(uuid.uuid4())
-        
-        address_json = request.delivery_address.dict() if request.delivery_address else None
-        
-        order_data = {
-            'id': order_id,
-            'tenant_id': TENANT_ID,
-            'branch_id': BRANCH_ID,
-            'order_number': order_number,
-            'order_type': request.order_type,
-            'channel': 'website',
-            'status': 'pending',
-            'customer_name': request.customer_name,
-            'customer_phone': request.customer_phone,
-            'customer_email': request.customer_email,
-            'delivery_address': address_json,
-            'delivery_instructions': request.delivery_instructions,
-            'subtotal': request.subtotal,
-            'discount_amount': request.discount_amount,
-            'delivery_fee': request.delivery_fee,
-            'tax_amount': 0,
-            'service_charge': 0,
-            'total_amount': request.total_amount,
-            'payment_status': 'pending',
-            'notes': request.notes,
-        }
-        
-        # Insert order
-        result = await supabase_request('POST', 'orders', data=order_data)
-        
-        # Insert order items
-        if request.items:
-            for item in request.items:
-                order_item_id = str(uuid.uuid4())
-                
-                # Insert order item
-                item_data = {
-                    'id': order_item_id,
-                    'order_id': order_id,
-                    'item_id': item.item_id,
-                    'item_name_en': item.item_name_en,
-                    'item_name_ar': item.item_name_ar,
-                    'quantity': item.quantity,
-                    'unit_price': item.unit_price,
-                    'total_price': item.total_price,
-                    'notes': item.notes,
-                    'status': 'pending',
-                }
-                await supabase_request('POST', 'order_items', data=item_data)
-                
-                # Insert item modifiers if any
-                if item.modifiers:
-                    for mod in item.modifiers:
-                        modifier_data = {
-                            'order_item_id': order_item_id,
-                            'modifier_id': mod.id if hasattr(mod, 'id') else mod.get('id', ''),
-                            'modifier_name_en': mod.name_en if hasattr(mod, 'name_en') else mod.get('name_en', mod.get('name', '')),
-                            'modifier_name_ar': mod.name_ar if hasattr(mod, 'name_ar') else mod.get('name_ar', ''),
-                            'quantity': 1,
-                            'price': mod.price if hasattr(mod, 'price') else mod.get('price', 0),
-                        }
-                        try:
-                            await supabase_request('POST', 'order_item_modifiers', data=modifier_data)
-                        except Exception as mod_err:
-                            logging.warning(f"Could not save modifier: {mod_err}")
-        
-        # Handle Tap payment if selected
-        payment_url = None
-        if request.payment_method == 'tap':
-            payment_url = await create_tap_charge_internal(
-                order_id=order_id,
-                amount=request.total_amount,
-                customer_name=request.customer_name,
-                customer_email=request.customer_email,
-                customer_phone=request.customer_phone,
+        # For cash payment, create order immediately
+        if request.payment_method != 'tap':
+            result = await create_order_in_db(request, payment_status='pending')
+            return OrderResponse(
+                id=result['id'],
+                order_number=result['order_number'],
+                status='pending',
+                created_at=result['created_at'],
+                requires_payment=False
             )
         
-        return OrderResponse(
-            id=order_id,
-            order_number=order_number,
-            status='pending',
-            created_at=datetime.utcnow().isoformat(),
-            payment_url=payment_url
-        )
+        # For online payment, create Tap charge first (don't create order yet)
+        frontend_url = os.environ.get('FRONTEND_URL', 'https://eatbam.me')
+        charge_ref = str(uuid.uuid4())
         
+        # Store order data temporarily
+        pending_payments[charge_ref] = {
+            'order_data': request.dict(),
+            'created_at': datetime.utcnow().isoformat()
+        }
+        
+        charge_data = {
+            "amount": request.total_amount,
+            "currency": "KWD",
+            "customer_initiated": True,
+            "threeDSecure": True,
+            "save_card": False,
+            "description": f"Bam Burgers Order",
+            "metadata": {
+                "charge_ref": charge_ref
+            },
+            "reference": {
+                "transaction": charge_ref,
+                "order": charge_ref
+            },
+            "receipt": {
+                "email": True,
+                "sms": True
+            },
+            "customer": {
+                "first_name": request.customer_name.split()[0] if request.customer_name else "Customer",
+                "last_name": request.customer_name.split()[-1] if request.customer_name and len(request.customer_name.split()) > 1 else "",
+                "email": request.customer_email or "customer@bamburgers.com",
+                "phone": {
+                    "country_code": "965",
+                    "number": request.customer_phone.replace("+965", "").replace(" ", "").replace("-", "") if request.customer_phone else "00000000"
+                }
+            },
+            "merchant": {
+                "id": TAP_MERCHANT_ID
+            },
+            "source": {
+                "id": "src_all"
+            },
+            "redirect": {
+                "url": f"{frontend_url}/payment-result?ref={charge_ref}"
+            }
+        }
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                "https://api.tap.company/v2/charges",
+                headers={
+                    "Authorization": f"Bearer {TAP_SECRET_KEY}",
+                    "Content-Type": "application/json",
+                    "accept": "application/json"
+                },
+                json=charge_data
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                payment_url = result.get('transaction', {}).get('url')
+                charge_id = result.get('id')
+                
+                # Update pending payment with charge_id
+                pending_payments[charge_ref]['charge_id'] = charge_id
+                
+                logging.info(f"Tap charge created: {charge_id} for ref {charge_ref}")
+                
+                return OrderResponse(
+                    id=charge_ref,  # This is the reference, not order_id yet
+                    order_number="",  # Will be assigned after payment
+                    status='awaiting_payment',
+                    created_at=datetime.utcnow().isoformat(),
+                    payment_url=payment_url,
+                    requires_payment=True
+                )
+            else:
+                logging.error(f"Tap charge failed: {response.text}")
+                raise HTTPException(status_code=400, detail="Payment initiation failed")
+                
     except HTTPException:
         raise
     except Exception as e:
@@ -322,18 +409,109 @@ async def create_order(request: CreateOrderRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.get("/payment/verify/{charge_ref}")
+async def verify_payment(charge_ref: str):
+    """Verify payment status and create order if successful"""
+    try:
+        # Get pending payment data
+        pending = pending_payments.get(charge_ref)
+        if not pending:
+            return {
+                "success": False,
+                "status": "not_found",
+                "message": "Payment reference not found or expired"
+            }
+        
+        charge_id = pending.get('charge_id')
+        if not charge_id:
+            return {
+                "success": False,
+                "status": "no_charge",
+                "message": "No charge ID found"
+            }
+        
+        # Verify charge with Tap API
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(
+                f"https://api.tap.company/v2/charges/{charge_id}",
+                headers={
+                    "Authorization": f"Bearer {TAP_SECRET_KEY}",
+                    "accept": "application/json"
+                }
+            )
+            
+            if response.status_code != 200:
+                logging.error(f"Tap verification failed: {response.text}")
+                return {
+                    "success": False,
+                    "status": "verification_failed",
+                    "message": "Could not verify payment"
+                }
+            
+            charge_data = response.json()
+            charge_status = charge_data.get('status', '').upper()
+            transaction_id = charge_data.get('id')
+            
+            logging.info(f"Tap charge {charge_id} status: {charge_status}")
+            
+            # Check if payment was successful
+            if charge_status == 'CAPTURED':
+                # Create order in database
+                order_request = CreateOrderRequest(**pending['order_data'])
+                result = await create_order_in_db(
+                    order_request, 
+                    payment_status='paid',
+                    transaction_id=transaction_id
+                )
+                
+                # Remove from pending
+                del pending_payments[charge_ref]
+                
+                return {
+                    "success": True,
+                    "status": "paid",
+                    "order_id": result['id'],
+                    "order_number": result['order_number'],
+                    "transaction_id": transaction_id,
+                    "message": "Payment successful! Order created."
+                }
+            
+            elif charge_status in ['CANCELLED', 'FAILED', 'DECLINED', 'RESTRICTED', 'VOID', 'TIMEDOUT']:
+                return {
+                    "success": False,
+                    "status": "failed",
+                    "message": f"Payment {charge_status.lower()}. Please try again."
+                }
+            
+            else:
+                # Still pending or unknown status
+                return {
+                    "success": False,
+                    "status": "pending",
+                    "message": "Payment is still being processed"
+                }
+                
+    except Exception as e:
+        logging.error(f"Payment verification error: {str(e)}")
+        return {
+            "success": False,
+            "status": "error",
+            "message": str(e)
+        }
+
+
 @api_router.get("/orders/{order_id}")
 async def get_order(order_id: str):
-    """Get order by ID with items and modifiers"""
+    """Get order by ID with items, modifiers, and payment info"""
     try:
         orders = await supabase_request('GET', 'orders', params={'id': f'eq.{order_id}', 'select': '*'})
         if not orders:
             raise HTTPException(status_code=404, detail="Order not found")
         
         order = orders[0]
-        items = await supabase_request('GET', 'order_items', params={'order_id': f'eq.{order_id}', 'select': '*'})
         
-        # Get modifiers for each item
+        # Get items with modifiers
+        items = await supabase_request('GET', 'order_items', params={'order_id': f'eq.{order_id}', 'select': '*'})
         items_with_modifiers = []
         for item in (items or []):
             modifiers = await supabase_request('GET', 'order_item_modifiers', params={
@@ -342,8 +520,16 @@ async def get_order(order_id: str):
             })
             item['modifiers'] = modifiers or []
             items_with_modifiers.append(item)
-        
         order['items'] = items_with_modifiers
+        
+        # Get payment info
+        payments = await supabase_request('GET', 'payments', params={
+            'order_id': f'eq.{order_id}',
+            'select': '*'
+        })
+        if payments:
+            order['payment'] = payments[0]
+        
         return order
     except HTTPException:
         raise
@@ -363,6 +549,15 @@ async def get_order_by_number(order_number: str):
         order = orders[0]
         items = await supabase_request('GET', 'order_items', params={'order_id': f'eq.{order["id"]}', 'select': '*'})
         order['items'] = items or []
+        
+        # Get payment info
+        payments = await supabase_request('GET', 'payments', params={
+            'order_id': f'eq.{order["id"]}',
+            'select': '*'
+        })
+        if payments:
+            order['payment'] = payments[0]
+        
         return order
     except HTTPException:
         raise
@@ -373,11 +568,11 @@ async def get_order_by_number(order_number: str):
 
 @api_router.patch("/orders/{order_id}/status")
 async def update_order_status(order_id: str, request: UpdateStatusRequest):
-    """Update order status in Supabase"""
+    """Update order status"""
     valid_statuses = ['pending', 'accepted', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'completed', 'cancelled']
     
     if request.status not in valid_statuses:
-        raise HTTPException(status_code=400, detail=f"Invalid status")
+        raise HTTPException(status_code=400, detail="Invalid status")
     
     try:
         update_data = {'status': request.status}
@@ -388,7 +583,6 @@ async def update_order_status(order_id: str, request: UpdateStatusRequest):
             update_data['completed_at'] = datetime.utcnow().isoformat()
         
         await supabase_request('PATCH', 'orders', data=update_data, params={'id': f'eq.{order_id}'})
-        
         return {"success": True, "status": request.status}
     except Exception as e:
         logging.error(f"Error updating order status: {str(e)}")
@@ -397,7 +591,7 @@ async def update_order_status(order_id: str, request: UpdateStatusRequest):
 
 @api_router.get("/admin/orders")
 async def get_all_orders(status: Optional[str] = None, limit: int = 100):
-    """Get all orders for admin panel"""
+    """Get all orders for admin panel with payment info"""
     try:
         params = {
             'select': '*',
@@ -410,10 +604,51 @@ async def get_all_orders(status: Optional[str] = None, limit: int = 100):
             params['status'] = f'eq.{status}'
         
         orders = await supabase_request('GET', 'orders', params=params)
+        
+        # Get payment info for each order
+        for order in (orders or []):
+            payments = await supabase_request('GET', 'payments', params={
+                'order_id': f'eq.{order["id"]}',
+                'select': '*'
+            })
+            if payments:
+                order['payment'] = payments[0]
+        
         return orders or []
     except Exception as e:
         logging.error(f"Error getting orders: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/tap/webhook")
+async def tap_webhook(request: Request):
+    """Handle Tap payment webhook"""
+    try:
+        data = await request.json()
+        
+        charge_id = data.get('id')
+        status = data.get('status', '').upper()
+        charge_ref = data.get('reference', {}).get('order') or data.get('metadata', {}).get('charge_ref')
+        
+        logging.info(f"Tap webhook received: charge={charge_id}, status={status}, ref={charge_ref}")
+        
+        if charge_ref and status == 'CAPTURED':
+            pending = pending_payments.get(charge_ref)
+            if pending and 'order_data' in pending:
+                # Create order
+                order_request = CreateOrderRequest(**pending['order_data'])
+                await create_order_in_db(
+                    order_request, 
+                    payment_status='paid',
+                    transaction_id=charge_id
+                )
+                del pending_payments[charge_ref]
+                logging.info(f"Order created via webhook for ref {charge_ref}")
+        
+        return {"received": True}
+    except Exception as e:
+        logging.error(f"Webhook error: {str(e)}")
+        return {"received": True}
 
 
 # ==================== COUPONS ====================
@@ -593,7 +828,7 @@ async def save_loyalty_settings(settings: LoyaltySettings):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ==================== MENU - CATEGORIES ====================
+# ==================== MENU ====================
 
 @api_router.get("/menu/categories")
 async def get_categories():
@@ -635,7 +870,6 @@ async def create_category(category: CategoryCreate):
             'tenant_id': TENANT_ID,
             **category.dict()
         }
-        
         result = await supabase_request('POST', 'categories', data=category_data)
         return result[0] if result else category_data
     except Exception as e:
@@ -664,8 +898,6 @@ async def delete_category(category_id: str):
         logging.error(f"Error deleting category: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-# ==================== MENU - ITEMS ====================
 
 @api_router.get("/menu/items")
 async def get_menu_items(category_id: Optional[str] = None):
@@ -712,7 +944,6 @@ async def create_item(item: ItemCreate):
             'tenant_id': TENANT_ID,
             **item.dict()
         }
-        
         result = await supabase_request('POST', 'items', data=item_data)
         return result[0] if result else item_data
     except Exception as e:
@@ -742,7 +973,7 @@ async def delete_item(item_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ==================== MODIFIER GROUPS ====================
+# ==================== MODIFIERS ====================
 
 @api_router.get("/admin/modifier-groups")
 async def get_modifier_groups():
@@ -768,7 +999,6 @@ async def create_modifier_group(group: ModifierGroupCreate):
             'tenant_id': TENANT_ID,
             **group.dict()
         }
-        
         result = await supabase_request('POST', 'modifier_groups', data=group_data)
         return result[0] if result else group_data
     except Exception as e:
@@ -798,8 +1028,6 @@ async def delete_modifier_group(group_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ==================== MODIFIERS ====================
-
 @api_router.get("/admin/modifiers")
 async def get_modifiers(group_id: Optional[str] = None):
     """Get modifiers"""
@@ -823,7 +1051,6 @@ async def create_modifier(modifier: ModifierCreate):
             'id': str(uuid.uuid4()),
             **modifier.dict()
         }
-        
         result = await supabase_request('POST', 'modifiers', data=modifier_data)
         return result[0] if result else modifier_data
     except Exception as e:
@@ -853,57 +1080,10 @@ async def delete_modifier(modifier_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ==================== ITEM-MODIFIER GROUP LINKS ====================
-
-@api_router.get("/admin/item-modifier-groups")
-async def get_item_modifier_groups(item_id: Optional[str] = None):
-    """Get item-modifier group links"""
-    try:
-        params = {'select': '*'}
-        if item_id:
-            params['item_id'] = f'eq.{item_id}'
-        
-        links = await supabase_request('GET', 'item_modifier_groups', params=params)
-        return links or []
-    except Exception as e:
-        logging.error(f"Error getting item modifier groups: {str(e)}")
-        return []
-
-
-@api_router.post("/admin/item-modifier-groups")
-async def link_item_modifier_group(link: ItemModifierGroupLink):
-    """Link a modifier group to an item"""
-    try:
-        link_data = {
-            'id': str(uuid.uuid4()),
-            **link.dict()
-        }
-        
-        result = await supabase_request('POST', 'item_modifier_groups', data=link_data)
-        return result[0] if result else link_data
-    except Exception as e:
-        logging.error(f"Error linking item to modifier group: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@api_router.delete("/admin/item-modifier-groups/{link_id}")
-async def unlink_item_modifier_group(link_id: str):
-    """Unlink a modifier group from an item"""
-    try:
-        await supabase_request('DELETE', 'item_modifier_groups', params={'id': f'eq.{link_id}'})
-        return {"success": True}
-    except Exception as e:
-        logging.error(f"Error unlinking item from modifier group: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ==================== MENU WITH MODIFIERS ====================
-
 @api_router.get("/menu/items/{item_id}/modifiers")
 async def get_item_modifiers(item_id: str):
     """Get all modifier groups and modifiers for an item"""
     try:
-        # Get linked modifier groups
         links = await supabase_request('GET', 'item_modifier_groups', params={
             'item_id': f'eq.{item_id}',
             'select': '*',
@@ -915,14 +1095,12 @@ async def get_item_modifiers(item_id: str):
         
         group_ids = [link['modifier_group_id'] for link in links]
         
-        # Get modifier groups
         groups = await supabase_request('GET', 'modifier_groups', params={
             'id': f'in.({",".join(group_ids)})',
             'status': 'eq.active',
             'select': '*'
         })
         
-        # Get modifiers for each group
         result = []
         for group in (groups or []):
             modifiers = await supabase_request('GET', 'modifiers', params={
@@ -974,183 +1152,11 @@ async def get_all_delivery_zones():
         return []
 
 
-# ==================== TAP PAYMENTS ====================
-
-async def create_tap_charge_internal(order_id: str, amount: float, customer_name: str, customer_email: str, customer_phone: str) -> Optional[str]:
-    """Create a Tap payment charge and return the redirect URL"""
-    try:
-        # Get frontend URL for redirect
-        frontend_url = os.environ.get('FRONTEND_URL', 'https://eatbam.me')
-        
-        charge_data = {
-            "amount": amount,
-            "currency": "KWD",
-            "customer_initiated": True,
-            "threeDSecure": True,
-            "save_card": False,
-            "description": f"Order {order_id}",
-            "reference": {
-                "transaction": order_id,
-                "order": order_id
-            },
-            "customer": {
-                "first_name": customer_name.split()[0] if customer_name else "Customer",
-                "last_name": customer_name.split()[-1] if customer_name and len(customer_name.split()) > 1 else "",
-                "email": customer_email or "customer@example.com",
-                "phone": {
-                    "country_code": "965",
-                    "number": customer_phone.replace("+965", "").replace(" ", "") if customer_phone else "00000000"
-                }
-            },
-            "source": {
-                "id": "src_all"
-            },
-            "post": {
-                "url": f"{frontend_url}/api/tap/webhook"
-            },
-            "redirect": {
-                "url": f"{frontend_url}/payment-result?order_id={order_id}"
-            }
-        }
-        
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://api.tap.company/v2/charges/",
-                headers={
-                    "Authorization": f"Bearer {TAP_SECRET_KEY}",
-                    "Content-Type": "application/json",
-                    "accept": "application/json"
-                },
-                json=charge_data
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                return result.get('transaction', {}).get('url')
-            else:
-                logging.error(f"Tap charge failed: {response.text}")
-                return None
-    except Exception as e:
-        logging.error(f"Error creating Tap charge: {str(e)}")
-        return None
-
-
-@api_router.post("/tap/charge")
-async def create_tap_charge(request: TapChargeRequest):
-    """Create a Tap payment charge"""
-    try:
-        charge_data = {
-            "amount": request.amount,
-            "currency": request.currency,
-            "customer_initiated": True,
-            "threeDSecure": True,
-            "save_card": False,
-            "description": request.description or f"Order {request.order_id}",
-            "reference": {
-                "transaction": request.order_id,
-                "order": request.order_id
-            },
-            "customer": {
-                "first_name": request.customer_name.split()[0] if request.customer_name else "Customer",
-                "last_name": request.customer_name.split()[-1] if request.customer_name and len(request.customer_name.split()) > 1 else "",
-                "email": request.customer_email or "customer@example.com",
-                "phone": {
-                    "country_code": "965",
-                    "number": request.customer_phone.replace("+965", "").replace(" ", "") if request.customer_phone else "00000000"
-                }
-            },
-            "source": {
-                "id": "src_all"
-            },
-            "post": {
-                "url": f"{request.redirect_url.rsplit('/', 1)[0]}/api/tap/webhook"
-            },
-            "redirect": {
-                "url": request.redirect_url
-            }
-        }
-        
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://api.tap.company/v2/charges/",
-                headers={
-                    "Authorization": f"Bearer {TAP_SECRET_KEY}",
-                    "Content-Type": "application/json",
-                    "accept": "application/json"
-                },
-                json=charge_data
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                return {
-                    "success": True,
-                    "charge_id": result.get('id'),
-                    "payment_url": result.get('transaction', {}).get('url'),
-                    "status": result.get('status')
-                }
-            else:
-                logging.error(f"Tap charge failed: {response.text}")
-                raise HTTPException(status_code=400, detail="Payment creation failed")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logging.error(f"Error creating Tap charge: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@api_router.post("/tap/webhook")
-async def tap_webhook(request: Request):
-    """Handle Tap payment webhook"""
-    try:
-        data = await request.json()
-        
-        charge_id = data.get('id')
-        status = data.get('status')
-        order_id = data.get('reference', {}).get('order')
-        
-        if order_id and status:
-            payment_status = 'paid' if status == 'CAPTURED' else 'failed'
-            await supabase_request('PATCH', 'orders', 
-                data={'payment_status': payment_status},
-                params={'id': f'eq.{order_id}'}
-            )
-        
-        return {"received": True}
-    except Exception as e:
-        logging.error(f"Webhook error: {str(e)}")
-        return {"received": True}
-
-
-@api_router.get("/tap/charge/{charge_id}")
-async def get_tap_charge(charge_id: str):
-    """Get Tap charge status"""
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"https://api.tap.company/v2/charges/{charge_id}",
-                headers={
-                    "Authorization": f"Bearer {TAP_SECRET_KEY}",
-                    "accept": "application/json"
-                }
-            )
-            
-            if response.status_code == 200:
-                return response.json()
-            else:
-                raise HTTPException(status_code=400, detail="Could not retrieve charge")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logging.error(f"Error getting Tap charge: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 # ==================== ADMIN SETTINGS ====================
 
 @api_router.get("/admin/settings")
 async def get_admin_settings():
-    """Get admin settings including payment keys"""
+    """Get admin settings"""
     return {
         "tap_public_key": TAP_PUBLIC_KEY,
         "tap_secret_key_set": bool(TAP_SECRET_KEY),
