@@ -42,6 +42,12 @@ app.add_middleware(
 
 # ==================== MODELS ====================
 
+class ModifierSelection(BaseModel):
+    id: str
+    name_en: str
+    name_ar: Optional[str] = None
+    price: float = 0
+
 class OrderItem(BaseModel):
     item_id: str
     item_name_en: str
@@ -50,7 +56,7 @@ class OrderItem(BaseModel):
     unit_price: float
     total_price: float
     notes: Optional[str] = None
-    modifiers: Optional[List[dict]] = []
+    modifiers: Optional[List[ModifierSelection]] = []
 
 class DeliveryAddress(BaseModel):
     area: str
