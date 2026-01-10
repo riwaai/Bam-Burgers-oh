@@ -1,5 +1,12 @@
 import React from 'react';
-import { LOGO_URL, RESTAURANT_ADDRESS, RESTAURANT_PHONE, RESTAURANT_NAME } from '@/integrations/supabase/client';
+import { RESTAURANT_NAME } from '@/integrations/supabase/client';
+
+interface OrderItemModifier {
+  modifier_name_en: string;
+  modifier_name_ar?: string;
+  price: number;
+  quantity?: number;
+}
 
 interface OrderReceiptProps {
   order: {
@@ -9,14 +16,31 @@ interface OrderReceiptProps {
     status: string;
     customer_name: string;
     customer_phone: string;
-    delivery_address?: any;
+    delivery_address?: {
+      area?: string;
+      block?: string;
+      street?: string;
+      building?: string;
+      floor?: string;
+      apartment?: string;
+      additional_directions?: string;
+    } | null;
     subtotal: number;
     discount_amount: number;
     delivery_fee: number;
     total_amount: number;
     notes?: string | null;
     created_at: string;
-    items?: any[];
+    items?: {
+      id?: string;
+      item_name_en: string;
+      item_name_ar?: string;
+      quantity: number;
+      unit_price: number;
+      total_price: number;
+      notes?: string;
+      modifiers?: OrderItemModifier[];
+    }[];
   };
 }
 
@@ -48,46 +72,50 @@ const OrderReceipt: React.FC<OrderReceiptProps> = ({ order }) => {
     return parts.join(', ');
   };
 
+  // Calculate totals
   const totalItems = order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+  
+  // Calculate item total including modifiers
+  const getItemTotal = (item: any) => {
+    const modifiersTotal = (item.modifiers || []).reduce((sum: number, mod: OrderItemModifier) => 
+      sum + (mod.price * (mod.quantity || 1)), 0
+    );
+    return item.total_price + (modifiersTotal * item.quantity);
+  };
 
   return (
     <div className="bg-white p-6 text-black text-sm" style={{ width: '320px', fontFamily: 'monospace' }}>
       {/* Header */}
       <div className="text-center border-b-2 border-black pb-4 mb-4">
         <p className="font-bold text-2xl">{RESTAURANT_NAME}</p>
-        <p className="text-xs">Salwa</p>
+        <p className="text-xs">Salwa, Kuwait</p>
         <p className="text-xs">{formatKuwaitDate(order.created_at)}</p>
       </div>
 
       {/* Bill Info */}
       <div className="text-center border-b border-dashed border-gray-400 pb-3 mb-3">
         <p className="font-bold">Quick Bill</p>
-        <p className="font-bold text-xl">Bill No:{order.order_number.split('-').pop()}</p>
-        <p className="text-sm">Quick Bill: {order.order_number.split('-').pop()}</p>
+        <p className="font-bold text-xl">Bill No: {order.order_number.split('-').pop()}</p>
+        <p className="text-xs uppercase">{order.order_type}</p>
       </div>
 
-      {/* User and Payment Info */}
-      <div className="flex justify-between border-b border-dashed border-gray-400 pb-3 mb-3 text-xs">
-        <div>
-          <p className="font-bold">Quick Bill</p>
-          <p>Pay Mode: Cash</p>
-        </div>
-        <div className="text-right">
-          <p>User: {order.customer_name || 'bamburger1'}</p>
-        </div>
+      {/* Customer Info */}
+      <div className="border-b border-dashed border-gray-400 pb-3 mb-3 text-xs">
+        <p><strong>Customer:</strong> {order.customer_name || 'Guest'}</p>
+        <p><strong>Phone:</strong> {order.customer_phone || 'N/A'}</p>
       </div>
 
       {/* Items Table Header */}
       <div className="border-b border-gray-300 pb-2 mb-2">
         <div className="grid grid-cols-12 text-xs font-bold">
           <div className="col-span-5">Item / غرض</div>
-          <div className="col-span-2 text-center">Qty / الكمية</div>
-          <div className="col-span-2 text-right">Rate / السعر</div>
-          <div className="col-span-3 text-right">Total / الإجمالي</div>
+          <div className="col-span-2 text-center">Qty</div>
+          <div className="col-span-2 text-right">Rate</div>
+          <div className="col-span-3 text-right">Total</div>
         </div>
       </div>
 
-      {/* Order Items */}
+      {/* Order Items with Modifiers */}
       <div className="border-b border-dashed border-gray-400 pb-3 mb-3">
         {order.items?.map((item, idx) => (
           <div key={idx} className="mb-3">
@@ -102,20 +130,51 @@ const OrderReceipt: React.FC<OrderReceiptProps> = ({ order }) => {
               <div className="col-span-2 text-right">{item.unit_price?.toFixed(3)}</div>
               <div className="col-span-3 text-right">{item.total_price?.toFixed(3)}</div>
             </div>
+            
+            {/* Modifiers/Add-ons */}
+            {item.modifiers && item.modifiers.length > 0 && (
+              <div className="ml-2 mt-1">
+                {item.modifiers.map((mod, modIdx) => (
+                  <div key={modIdx} className="grid grid-cols-12 text-xs text-orange-700">
+                    <div className="col-span-7">+ {mod.modifier_name_en}</div>
+                    <div className="col-span-5 text-right">
+                      {mod.price > 0 ? `+${mod.price.toFixed(3)}` : ''}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {/* Item Notes */}
             {item.notes && (
-              <p className="text-xs text-orange-600 mt-1">* {item.notes}</p>
+              <p className="text-xs text-orange-600 mt-1 italic">* {item.notes}</p>
             )}
           </div>
         ))}
       </div>
 
       {/* Totals Section */}
-      <div className="border-b border-dashed border-gray-400 pb-3 mb-3">
-        <div className="flex justify-between text-sm font-bold">
-          <span>Total:</span>
+      <div className="border-b border-dashed border-gray-400 pb-3 mb-3 text-sm">
+        <div className="flex justify-between">
+          <span>Items:</span>
           <span>{totalItems}</span>
-          <span>د.ك {order.subtotal?.toFixed(3)}</span>
         </div>
+        <div className="flex justify-between">
+          <span>Subtotal:</span>
+          <span>{order.subtotal?.toFixed(3)} KWD</span>
+        </div>
+        {order.discount_amount > 0 && (
+          <div className="flex justify-between text-green-600">
+            <span>Discount:</span>
+            <span>-{order.discount_amount?.toFixed(3)} KWD</span>
+          </div>
+        )}
+        {order.delivery_fee > 0 && (
+          <div className="flex justify-between">
+            <span>Delivery:</span>
+            <span>{order.delivery_fee?.toFixed(3)} KWD</span>
+          </div>
+        )}
       </div>
 
       {/* Grand Total */}
@@ -125,29 +184,24 @@ const OrderReceipt: React.FC<OrderReceiptProps> = ({ order }) => {
         <p className="font-bold text-2xl mt-2">د.ك {order.total_amount?.toFixed(3)}</p>
       </div>
 
-      {/* Discount if any */}
-      {order.discount_amount > 0 && (
-        <div className="flex justify-between text-sm text-green-600 mb-2">
-          <span>Discount / الخصم:</span>
-          <span>-{order.discount_amount?.toFixed(3)} KWD</span>
+      {/* Order Notes */}
+      {order.notes && (
+        <div className="border-t border-dashed border-gray-400 pt-3 mb-3 text-xs">
+          <p className="font-bold">Order Notes:</p>
+          <p className="text-orange-700">{order.notes}</p>
         </div>
       )}
 
-      {/* Delivery Fee if any */}
-      {order.delivery_fee > 0 && (
-        <div className="flex justify-between text-sm mb-2">
-          <span>Delivery Fee / رسوم التوصيل:</span>
-          <span>{order.delivery_fee?.toFixed(3)} KWD</span>
-        </div>
-      )}
-
-      {/* Customer Info if delivery */}
+      {/* Delivery Address */}
       {order.order_type === 'delivery' && order.delivery_address && (
         <div className="border-t border-dashed border-gray-400 pt-3 mt-3 text-xs">
           <p className="font-bold mb-1">Delivery To / التوصيل إلى:</p>
           <p>{order.customer_name}</p>
           <p>{order.customer_phone}</p>
           <p>{formatAddress(order.delivery_address)}</p>
+          {order.delivery_address.additional_directions && (
+            <p className="text-gray-600 italic mt-1">{order.delivery_address.additional_directions}</p>
+          )}
         </div>
       )}
 
