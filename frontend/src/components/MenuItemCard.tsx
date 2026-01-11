@@ -58,7 +58,7 @@ const MenuItemCard = ({ item }: MenuItemCardProps) => {
             </div>
           )}
         </div>
-        <CardContent className="p-4 space-y-3">
+        <CardContent className="p-4 flex flex-col h-full">
           <div className="flex items-start justify-between gap-2">
             <h3 className="font-semibold text-base leading-tight line-clamp-2">
               {displayName}
@@ -70,11 +70,11 @@ const MenuItemCard = ({ item }: MenuItemCardProps) => {
               </span>
             </span>
           </div>
-          <p className="text-sm text-muted-foreground line-clamp-2">
+          <p className="text-sm text-muted-foreground line-clamp-2 flex-grow min-h-[2.5rem]">
             {displayDescription || ''}
           </p>
           <Button 
-            className="w-full" 
+            className="w-full mt-3" 
             size="sm"
             disabled={!isAvailable}
           >
