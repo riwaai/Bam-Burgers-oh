@@ -326,6 +326,10 @@ const AdminOrders = () => {
     });
   };
 
+  const openReceiptPreview = () => {
+    setShowReceiptPreview(true);
+  };
+
   const handlePrintReceipt = () => {
     const printContent = receiptRef.current;
     if (!printContent) return;
@@ -384,6 +388,29 @@ const AdminOrders = () => {
       printWindow.print();
       printWindow.close();
     };
+  };
+
+  const handleDownloadPNG = async () => {
+    const receiptElement = receiptRef.current;
+    if (!receiptElement) return;
+
+    try {
+      const canvas = await html2canvas(receiptElement, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        logging: false,
+      });
+      
+      const link = document.createElement('a');
+      link.download = `receipt-${selectedOrder?.order_number}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      
+      toast.success('Receipt downloaded');
+    } catch (err) {
+      console.error('Download error:', err);
+      toast.error('Failed to download receipt');
+    }
   };
 
   const filteredOrders = statusFilter === 'all' ? orders : orders.filter(o => o.status === statusFilter);
