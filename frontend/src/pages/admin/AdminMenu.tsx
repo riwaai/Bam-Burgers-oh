@@ -261,7 +261,6 @@ const AdminMenu = () => {
       image_url: '',
       status: 'active',
       sort_order: 0,
-      is_popular: false,
     });
     setEditingItem(null);
   };
