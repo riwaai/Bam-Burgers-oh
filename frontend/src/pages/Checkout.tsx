@@ -17,6 +17,7 @@ import { useCustomerAuth } from "@/contexts/CustomerAuthContext";
 import { formatPrice } from "@/hooks/useSupabaseMenu";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { supabase, BRANCH_ID } from "@/integrations/supabase/client";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 const KUWAIT_CENTER: [number, number] = [29.3759, 47.9774];
@@ -38,7 +39,36 @@ const Checkout = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [mapPosition, setMapPosition] = useState<[number, number] | null>(null);
-  const deliveryFee = isPickup ? 0 : 0.500;
+  const [deliveryFee, setDeliveryFee] = useState(0);
+  
+  // Fetch delivery fee from Supabase
+  useEffect(() => {
+    const fetchDeliveryFee = async () => {
+      if (isPickup) {
+        setDeliveryFee(0);
+        return;
+      }
+      try {
+        const { data, error } = await supabase
+          .from('delivery_zones')
+          .select('delivery_fee')
+          .eq('branch_id', BRANCH_ID)
+          .eq('status', 'active')
+          .limit(1)
+          .single();
+        
+        if (data && !error) {
+          setDeliveryFee(data.delivery_fee || 0);
+        } else {
+          setDeliveryFee(0); // Default to 0 if no zone found
+        }
+      } catch (err) {
+        console.error('Error fetching delivery fee:', err);
+        setDeliveryFee(0);
+      }
+    };
+    fetchDeliveryFee();
+  }, [isPickup]);
   
   const [formData, setFormData] = useState({
     firstName: customer?.name?.split(' ')[0] || '',
