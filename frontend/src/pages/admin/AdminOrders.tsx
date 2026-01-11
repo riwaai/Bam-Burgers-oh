@@ -777,15 +777,20 @@ const AdminOrders = () => {
       {/* Receipt Dialog */}
       <Dialog open={showReceipt} onOpenChange={() => setShowReceipt(false)}>
         <DialogContent className="max-w-md max-h-[90vh] flex flex-col">
-          <DialogHeader><DialogTitle>Receipt</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Receipt Preview</DialogTitle></DialogHeader>
           <div className="flex gap-3 pb-4 border-b">
-            <Button variant="outline" onClick={() => setShowReceipt(false)} className="flex-1">Close</Button>
-            <Button onClick={handlePrintReceipt} className="flex-1">
-              <Printer className="h-4 w-4 mr-2" />Print Receipt
+            <Button variant="outline" onClick={() => setShowReceipt(false)}>
+              <X className="h-4 w-4 mr-2" />Close
+            </Button>
+            <Button variant="outline" onClick={handleDownloadPNG}>
+              <Download className="h-4 w-4 mr-2" />Download PNG
+            </Button>
+            <Button onClick={handlePrintReceipt}>
+              <Printer className="h-4 w-4 mr-2" />Print
             </Button>
           </div>
-          <div className="overflow-y-auto flex-1">
-            <div ref={receiptRef} className="bg-white">
+          <div className="overflow-y-auto flex-1 p-4 bg-gray-100 rounded-lg">
+            <div ref={receiptRef} className="bg-white mx-auto shadow-lg" style={{ width: '80mm' }}>
               {selectedOrder && <OrderReceipt order={selectedOrder} />}
             </div>
           </div>
