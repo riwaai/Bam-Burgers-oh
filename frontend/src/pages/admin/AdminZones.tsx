@@ -31,9 +31,9 @@ const AdminZones = () => {
   const [editingZone, setEditingZone] = useState<DeliveryZone | null>(null);
   
   const [form, setForm] = useState({
-    zone_name: '',
-    delivery_fee: 0.5,
-    min_order_amount: 3,
+    zone_name: 'Salwa',
+    delivery_fee: 0,
+    min_order_amount: 0,
     estimated_time_minutes: 30,
     status: 'active',
     coordinates: '' as string,
