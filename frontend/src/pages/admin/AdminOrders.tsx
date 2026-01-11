@@ -438,7 +438,7 @@ const AdminOrders = () => {
                   {order.order_type === 'delivery' && order.delivery_address && (
                     <p className="text-sm text-muted-foreground flex items-center gap-1">
                       <MapPin className="h-3 w-3" />
-                      {formatShortAddress(order.delivery_address)}
+                      {formatShortAddress(parseDeliveryAddress(order.delivery_address))}
                     </p>
                   )}
                   
