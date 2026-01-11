@@ -660,9 +660,9 @@ const AdminOrders = () => {
                         <Check className="h-4 w-4" />
                         Paid via Online Payment
                       </p>
-                      {selectedOrder.payment?.transaction_id && (
+                      {(selectedOrder.payment?.transaction_id || selectedOrder.transaction_id) && (
                         <p className="text-xs text-green-600 mt-1 font-mono">
-                          Transaction ID: {selectedOrder.payment.transaction_id}
+                          Transaction ID: {selectedOrder.payment?.transaction_id || selectedOrder.transaction_id}
                         </p>
                       )}
                       {selectedOrder.payment?.provider && (
