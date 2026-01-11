@@ -90,7 +90,7 @@ const PaymentResult = () => {
     if (status === 'verifying') {
       verifyPayment();
     }
-  }, [tapId, chargeRef, verificationAttempts, status, clearCart]);
+  }, [tapId, orderId, chargeRef, verificationAttempts, status, clearCart]);
 
   const handleBackToCheckout = () => {
     // Navigate back to checkout - cart is preserved since we didn't clear it
