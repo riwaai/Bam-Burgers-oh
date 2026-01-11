@@ -59,14 +59,15 @@ interface Order {
   delivery_fee: number;
   total_amount: number;
   payment_status: string;
+  transaction_id?: string | null;  // Direct from orders table
   notes: string | null;
   created_at: string;
   items?: OrderItem[];
   // Payment info
   payment?: {
-    id: string;
+    id?: string;
     transaction_id: string;
-    amount: number;
+    amount?: number;
     status: string;
     provider: string;
   } | null;
