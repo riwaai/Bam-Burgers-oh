@@ -96,12 +96,13 @@ const OrderReceipt: React.FC<OrderReceiptProps> = ({ order }) => {
   };
 
   return (
-    <div className="bg-white p-4 text-black text-sm print-receipt" style={{ width: '80mm', maxWidth: '80mm', fontFamily: 'monospace' }}>
+    <div className="bg-white p-4 text-black text-sm print-receipt" style={{ width: '80mm', maxWidth: '80mm', fontFamily: 'Courier New, monospace' }}>
       {/* Header */}
       <div className="text-center border-b-2 border-black pb-3 mb-3">
         <p className="font-bold text-xl">{RESTAURANT_NAME}</p>
         <p className="text-xs">Salwa, Kuwait</p>
-        <p className="text-xs">{formatKuwaitDate(order.created_at)}</p>
+        <p className="text-xs">Printed: {getCurrentTime()}</p>
+        <p className="text-xs text-gray-500">Order Time: {formatKuwaitDate(order.created_at)}</p>
       </div>
 
       {/* Bill Info */}
