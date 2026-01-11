@@ -290,7 +290,7 @@ const AdminMenu = () => {
       name_ar: item.name_ar,
       description_en: item.description_en || '',
       description_ar: item.description_ar || '',
-      price: item.price,
+      base_price: item.base_price,
       image_url: item.image_url || '',
       status: item.status,
       sort_order: item.sort_order,
