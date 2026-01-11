@@ -216,7 +216,7 @@ async def api_health_check():
 
 # ==================== ORDERS ====================
 
-async def create_order_in_db(request: CreateOrderRequest, payment_status: str = 'pending', transaction_id: str = None) -> dict:
+async def create_order_in_db(request: CreateOrderRequest, payment_status: str = 'pending', transaction_id: str = None, provider_response: dict = None) -> dict:
     """Create order in Supabase database"""
     order_number = generate_order_number()
     order_id = str(uuid.uuid4())
@@ -248,6 +248,7 @@ async def create_order_in_db(request: CreateOrderRequest, payment_status: str = 
     
     # Insert order
     await supabase_request('POST', 'orders', data=order_data)
+    logging.info(f"Order created: {order_id} - {order_number}")
     
     # Insert order items
     if request.items:
@@ -295,8 +296,11 @@ async def create_order_in_db(request: CreateOrderRequest, payment_status: str = 
             'currency': 'KWD',
             'status': 'completed',
             'transaction_id': transaction_id,
+            'provider_response': provider_response,
+            'completed_at': datetime.utcnow().isoformat(),
         }
         await supabase_request('POST', 'payments', data=payment_data)
+        logging.info(f"Payment record created for order {order_id}: transaction_id={transaction_id}")
     
     return {
         'id': order_id,
