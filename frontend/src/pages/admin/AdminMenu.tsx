@@ -658,13 +658,6 @@ const AdminMenu = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2 flex items-center gap-2 pt-7">
-                <Switch
-                  checked={itemForm.is_popular}
-                  onCheckedChange={(checked) => setItemForm({ ...itemForm, is_popular: checked })}
-                />
-                <Label>Mark as Popular</Label>
-              </div>
             </div>
           </div>
           <DialogFooter>
