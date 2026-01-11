@@ -545,15 +545,18 @@ const AdminOrders = () => {
                     <h3 className="font-semibold mb-3 flex items-center gap-2">
                       <MapPin className="h-4 w-4" /> Delivery Address
                     </h3>
-                    {selectedOrder.delivery_address ? (
-                      <div className="space-y-1 text-sm">
-                        {formatFullAddress(selectedOrder.delivery_address).map((line, i) => (
-                          <p key={i}>{line}</p>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No address provided</p>
-                    )}
+                    {(() => {
+                      const addr = parseDeliveryAddress(selectedOrder.delivery_address);
+                      return addr ? (
+                        <div className="space-y-1 text-sm">
+                          {formatFullAddress(addr).map((line, i) => (
+                            <p key={i}>{line}</p>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No address provided</p>
+                      );
+                    })()}
                     {selectedOrder.delivery_instructions && (
                       <div className="mt-3 pt-3 border-t border-blue-200">
                         <p className="text-sm"><strong>Delivery Instructions:</strong></p>
