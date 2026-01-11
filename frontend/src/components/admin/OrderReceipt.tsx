@@ -89,8 +89,7 @@ const OrderReceipt: React.FC<OrderReceiptProps> = ({ order }) => {
       <div className="text-center border-b-2 border-black pb-3 mb-3">
         <p className="font-bold text-xl">{RESTAURANT_NAME}</p>
         <p className="text-xs">Salwa, Kuwait</p>
-        <p className="text-xs">Printed: {getCurrentTime()}</p>
-        <p className="text-xs text-gray-500">Order Time: {formatKuwaitDate(order.created_at)}</p>
+        <p className="text-xs">{formatKuwaitDate(order.created_at)}</p>
       </div>
 
       {/* Bill Info */}
