@@ -186,9 +186,19 @@ const AdminOrders = () => {
       
       if (error) throw error;
       
-      // Fetch items and modifiers for each order
+      // Fetch items, modifiers, and payment info for each order
       const ordersWithItems = await Promise.all(
         (ordersData || []).map(async (order) => {
+          // Parse delivery_address if it's a string
+          let parsedOrder = { ...order };
+          if (typeof order.delivery_address === 'string') {
+            try {
+              parsedOrder.delivery_address = JSON.parse(order.delivery_address);
+            } catch {
+              parsedOrder.delivery_address = null;
+            }
+          }
+          
           const { data: items } = await supabase
             .from('order_items')
             .select('*')
@@ -205,7 +215,18 @@ const AdminOrders = () => {
             })
           );
           
-          return { ...order, items: itemsWithModifiers };
+          // Fetch payment info
+          const { data: payments } = await supabase
+            .from('payments')
+            .select('id, transaction_id, amount, status, provider')
+            .eq('order_id', order.id)
+            .limit(1);
+          
+          return { 
+            ...parsedOrder, 
+            items: itemsWithModifiers,
+            payment: payments && payments.length > 0 ? payments[0] : null
+          };
         })
       );
       
