@@ -88,6 +88,7 @@ const AdminZones = () => {
       }
 
       const zoneData = {
+        branch_id: BRANCH_ID,
         zone_name: form.zone_name,
         zone_type: 'polygon',
         coordinates: coordinates,
