@@ -272,7 +272,26 @@ const Checkout = () => {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="phone">{t.checkout.phone} *</Label>
-                      <Input id="phone" name="phone" type="tel" placeholder="+965 XXXX XXXX" value={formData.phone} onChange={handleInputChange} required dir="ltr" />
+                      <div className="flex">
+                        <div className="flex items-center px-3 bg-muted border border-r-0 rounded-l-md text-sm text-muted-foreground">
+                          +965
+                        </div>
+                        <Input 
+                          id="phone" 
+                          name="phone" 
+                          type="tel" 
+                          placeholder="XXXX XXXX" 
+                          value={formData.phone.replace(/^\+965\s*/, '')} 
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/[^\d]/g, '').slice(0, 8);
+                            setFormData(prev => ({ ...prev, phone: `+965${value}` }));
+                          }} 
+                          required 
+                          dir="ltr" 
+                          className="rounded-l-none"
+                          maxLength={8}
+                        />
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="email">{t.checkout.email}</Label>
