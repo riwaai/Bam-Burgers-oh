@@ -11,30 +11,34 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase, TENANT_ID } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+// Match the actual Supabase coupons table schema
 interface Coupon {
   id: string;
   code: string;
-  description: string;
-  discount_type: 'percentage' | 'fixed';
+  name_en?: string;
+  name_ar?: string;
+  discount_type: 'percent' | 'fixed';
   discount_value: number;
-  min_order_amount: number;
-  max_discount_amount?: number;
-  max_uses?: number;
-  uses_count: number;
+  min_basket: number;
+  max_discount?: number;
+  valid_from?: string;
+  valid_to?: string;
+  usage_limit?: number;
+  per_customer_limit: number;
   status: 'active' | 'inactive';
   created_at?: string;
 }
 
-const defaultCoupon: Coupon = {
-  id: '',
+const defaultCoupon: Partial<Coupon> = {
   code: '',
-  description: '',
-  discount_type: 'percentage',
+  name_en: '',
+  name_ar: '',
+  discount_type: 'percent',
   discount_value: 10,
-  min_order_amount: 0,
-  max_discount_amount: undefined,
-  max_uses: undefined,
-  uses_count: 0,
+  min_basket: 0,
+  max_discount: undefined,
+  usage_limit: undefined,
+  per_customer_limit: 1,
   status: 'active',
 };
 
@@ -42,7 +46,7 @@ const AdminCoupons = () => {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
-  const [editingCoupon, setEditingCoupon] = useState<Coupon>(defaultCoupon);
+  const [editingCoupon, setEditingCoupon] = useState<Partial<Coupon>>(defaultCoupon);
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [saving, setSaving] = useState(false);
@@ -77,19 +81,23 @@ const AdminCoupons = () => {
 
     setSaving(true);
     try {
-      if (isEditing) {
+      const couponData = {
+        code: editingCoupon.code.toUpperCase(),
+        name_en: editingCoupon.name_en || null,
+        name_ar: editingCoupon.name_ar || null,
+        discount_type: editingCoupon.discount_type,
+        discount_value: editingCoupon.discount_value,
+        min_basket: editingCoupon.min_basket || 0,
+        max_discount: editingCoupon.max_discount || null,
+        usage_limit: editingCoupon.usage_limit || null,
+        per_customer_limit: editingCoupon.per_customer_limit || 1,
+        status: editingCoupon.status,
+      };
+
+      if (isEditing && editingCoupon.id) {
         const { error } = await supabase
           .from('coupons')
-          .update({
-            code: editingCoupon.code.toUpperCase(),
-            description: editingCoupon.description,
-            discount_type: editingCoupon.discount_type,
-            discount_value: editingCoupon.discount_value,
-            min_order_amount: editingCoupon.min_order_amount,
-            max_discount_amount: editingCoupon.max_discount_amount,
-            max_uses: editingCoupon.max_uses,
-            status: editingCoupon.status,
-          })
+          .update(couponData)
           .eq('id', editingCoupon.id);
         
         if (error) throw error;
@@ -99,15 +107,7 @@ const AdminCoupons = () => {
           .from('coupons')
           .insert({
             tenant_id: TENANT_ID,
-            code: editingCoupon.code.toUpperCase(),
-            description: editingCoupon.description,
-            discount_type: editingCoupon.discount_type,
-            discount_value: editingCoupon.discount_value,
-            min_order_amount: editingCoupon.min_order_amount,
-            max_discount_amount: editingCoupon.max_discount_amount,
-            max_uses: editingCoupon.max_uses,
-            uses_count: 0,
-            status: editingCoupon.status,
+            ...couponData,
           });
         
         if (error) throw error;
@@ -118,6 +118,7 @@ const AdminCoupons = () => {
       setEditingCoupon(defaultCoupon);
       fetchCoupons();
     } catch (err: any) {
+      console.error('Error saving coupon:', err);
       toast.error(err.message || 'Failed to save coupon');
     } finally {
       setSaving(false);
@@ -155,7 +156,7 @@ const AdminCoupons = () => {
 
   const filteredCoupons = coupons.filter(c => 
     c.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    c.name_en?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) {
@@ -202,33 +203,33 @@ const AdminCoupons = () => {
                   {coupon.status}
                 </Badge>
               </div>
-              {coupon.description && (
-                <CardDescription>{coupon.description}</CardDescription>
+              {coupon.name_en && (
+                <CardDescription>{coupon.name_en}</CardDescription>
               )}
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="text-2xl font-bold text-primary">
-                {coupon.discount_type === 'percentage' 
+                {coupon.discount_type === 'percent' 
                   ? `${coupon.discount_value}% OFF`
                   : `${coupon.discount_value.toFixed(3)} KWD OFF`
                 }
               </div>
               
-              {coupon.min_order_amount > 0 && (
+              {coupon.min_basket > 0 && (
                 <p className="text-sm text-muted-foreground">
-                  Min. order: {coupon.min_order_amount.toFixed(3)} KWD
+                  Min. order: {coupon.min_basket.toFixed(3)} KWD
                 </p>
               )}
               
-              {coupon.max_discount_amount && (
+              {coupon.max_discount && (
                 <p className="text-sm text-muted-foreground">
-                  Max discount: {coupon.max_discount_amount.toFixed(3)} KWD
+                  Max discount: {coupon.max_discount.toFixed(3)} KWD
                 </p>
               )}
               
               <div className="flex items-center justify-between pt-3 border-t">
                 <span className="text-sm text-muted-foreground">
-                  Used: {coupon.uses_count || 0}{coupon.max_uses ? `/${coupon.max_uses}` : ''} times
+                  {coupon.usage_limit ? `Limit: ${coupon.usage_limit}` : 'Unlimited'}
                 </span>
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" onClick={() => openEditDialog(coupon)}>
@@ -260,19 +261,30 @@ const AdminCoupons = () => {
             <div className="space-y-2">
               <Label>Code *</Label>
               <Input
-                value={editingCoupon.code}
+                value={editingCoupon.code || ''}
                 onChange={(e) => setEditingCoupon({ ...editingCoupon, code: e.target.value.toUpperCase() })}
                 placeholder="e.g., SAVE20"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Input
-                value={editingCoupon.description || ''}
-                onChange={(e) => setEditingCoupon({ ...editingCoupon, description: e.target.value })}
-                placeholder="e.g., 20% off summer sale"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Name (English)</Label>
+                <Input
+                  value={editingCoupon.name_en || ''}
+                  onChange={(e) => setEditingCoupon({ ...editingCoupon, name_en: e.target.value })}
+                  placeholder="Summer Sale"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Name (Arabic)</Label>
+                <Input
+                  value={editingCoupon.name_ar || ''}
+                  onChange={(e) => setEditingCoupon({ ...editingCoupon, name_ar: e.target.value })}
+                  placeholder="تخفيضات الصيف"
+                  dir="rtl"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -280,7 +292,7 @@ const AdminCoupons = () => {
                 <Label>Discount Type</Label>
                 <Select
                   value={editingCoupon.discount_type}
-                  onValueChange={(value: 'percentage' | 'fixed') => 
+                  onValueChange={(value: 'percent' | 'fixed') => 
                     setEditingCoupon({ ...editingCoupon, discount_type: value })
                   }
                 >
@@ -288,7 +300,7 @@ const AdminCoupons = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="percentage">Percentage (%)</SelectItem>
+                    <SelectItem value="percent">Percentage (%)</SelectItem>
                     <SelectItem value="fixed">Fixed (KWD)</SelectItem>
                   </SelectContent>
                 </Select>
@@ -298,7 +310,8 @@ const AdminCoupons = () => {
                 <Label>Discount Value</Label>
                 <Input
                   type="number"
-                  value={editingCoupon.discount_value}
+                  step="0.001"
+                  value={editingCoupon.discount_value || 0}
                   onChange={(e) => setEditingCoupon({ ...editingCoupon, discount_value: parseFloat(e.target.value) || 0 })}
                 />
               </div>
@@ -306,12 +319,12 @@ const AdminCoupons = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Min Order (KWD)</Label>
+                <Label>Min Basket (KWD)</Label>
                 <Input
                   type="number"
                   step="0.001"
-                  value={editingCoupon.min_order_amount}
-                  onChange={(e) => setEditingCoupon({ ...editingCoupon, min_order_amount: parseFloat(e.target.value) || 0 })}
+                  value={editingCoupon.min_basket || 0}
+                  onChange={(e) => setEditingCoupon({ ...editingCoupon, min_basket: parseFloat(e.target.value) || 0 })}
                 />
               </div>
 
@@ -320,21 +333,31 @@ const AdminCoupons = () => {
                 <Input
                   type="number"
                   step="0.001"
-                  value={editingCoupon.max_discount_amount || ''}
-                  onChange={(e) => setEditingCoupon({ ...editingCoupon, max_discount_amount: parseFloat(e.target.value) || undefined })}
+                  value={editingCoupon.max_discount || ''}
+                  onChange={(e) => setEditingCoupon({ ...editingCoupon, max_discount: parseFloat(e.target.value) || undefined })}
                   placeholder="No limit"
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Max Uses</Label>
-              <Input
-                type="number"
-                value={editingCoupon.max_uses || ''}
-                onChange={(e) => setEditingCoupon({ ...editingCoupon, max_uses: parseInt(e.target.value) || undefined })}
-                placeholder="Unlimited"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Usage Limit</Label>
+                <Input
+                  type="number"
+                  value={editingCoupon.usage_limit || ''}
+                  onChange={(e) => setEditingCoupon({ ...editingCoupon, usage_limit: parseInt(e.target.value) || undefined })}
+                  placeholder="Unlimited"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Per Customer Limit</Label>
+                <Input
+                  type="number"
+                  value={editingCoupon.per_customer_limit || 1}
+                  onChange={(e) => setEditingCoupon({ ...editingCoupon, per_customer_limit: parseInt(e.target.value) || 1 })}
+                />
+              </div>
             </div>
 
             <div className="flex items-center justify-between">
