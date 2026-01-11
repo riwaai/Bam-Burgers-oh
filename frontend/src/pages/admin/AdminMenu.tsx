@@ -261,7 +261,7 @@ const AdminMenu = () => {
       name_ar: '',
       description_en: '',
       description_ar: '',
-      price: 0,
+      base_price: 0,
       image_url: '',
       status: 'active',
       sort_order: 0,
