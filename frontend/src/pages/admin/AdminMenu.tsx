@@ -289,7 +289,6 @@ const AdminMenu = () => {
       image_url: item.image_url || '',
       status: item.status,
       sort_order: item.sort_order,
-      is_popular: item.is_popular || false,
     });
     setShowItemDialog(true);
   };
