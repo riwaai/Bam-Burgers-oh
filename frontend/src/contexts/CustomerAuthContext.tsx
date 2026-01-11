@@ -7,20 +7,20 @@ import {
   onAuthStateChanged,
   User as FirebaseUser
 } from '@/integrations/firebase/client';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, TENANT_ID } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export interface Customer {
   id: string;
-  firebase_uid: string;
-  email: string;
-  name?: string;
-  phone?: string;
+  email: string | null;
+  phone: string | null;
+  name: string | null;
   loyalty_points: number;
-  loyalty_tier: 'bronze' | 'silver' | 'gold' | 'platinum';
-  total_orders: number;
-  total_spent: number;
+  wallet_balance: number;
+  language: string;
+  status: string;
   created_at: string;
+  updated_at: string;
 }
 
 interface CustomerAuthContextType {
@@ -32,6 +32,7 @@ interface CustomerAuthContextType {
   signUp: (email: string, password: string, name?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Customer>) => Promise<{ error: Error | null }>;
+  refreshCustomer: () => Promise<void>;
 }
 
 const CustomerAuthContext = createContext<CustomerAuthContextType | undefined>(undefined);
@@ -41,14 +42,20 @@ export const CustomerAuthProvider = ({ children }: { children: ReactNode }) => {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Sync customer data to Supabase
+  // Sync customer data to Supabase using email as the key
   const syncCustomerToSupabase = async (user: FirebaseUser, name?: string): Promise<Customer | null> => {
     try {
-      // Check if customer exists
+      if (!user.email) {
+        console.error('User has no email');
+        return null;
+      }
+
+      // Check if customer exists by email
       const { data: existingCustomer, error: fetchError } = await supabase
         .from('customers')
         .select('*')
-        .eq('firebase_uid', user.uid)
+        .eq('tenant_id', TENANT_ID)
+        .eq('email', user.email)
         .maybeSingle();
 
       if (fetchError && fetchError.code !== 'PGRST116') {
@@ -57,11 +64,11 @@ export const CustomerAuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (existingCustomer) {
-        // Update last login
+        // Update last activity
         const { data: updatedCustomer, error: updateError } = await supabase
           .from('customers')
           .update({ updated_at: new Date().toISOString() })
-          .eq('firebase_uid', user.uid)
+          .eq('id', existingCustomer.id)
           .select()
           .single();
 
@@ -72,15 +79,16 @@ export const CustomerAuthProvider = ({ children }: { children: ReactNode }) => {
         return updatedCustomer as Customer;
       }
 
-      // Create new customer
+      // Create new customer in Supabase
       const newCustomer = {
-        firebase_uid: user.uid,
-        email: user.email || '',
+        tenant_id: TENANT_ID,
+        email: user.email,
         name: name || user.displayName || '',
+        phone: null,
         loyalty_points: 0,
-        loyalty_tier: 'bronze',
-        total_orders: 0,
-        total_spent: 0,
+        wallet_balance: 0,
+        language: 'en',
+        status: 'active',
       };
 
       const { data: createdCustomer, error: createError } = await supabase
@@ -91,24 +99,46 @@ export const CustomerAuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (createError) {
         console.error('Error creating customer:', createError);
-        // Return a mock customer if DB doesn't have the table yet
+        // Return a local customer object if insert fails (RLS issue)
         return {
-          id: user.uid,
-          firebase_uid: user.uid,
-          email: user.email || '',
+          id: '',
+          email: user.email,
           name: name || user.displayName || '',
+          phone: null,
           loyalty_points: 0,
-          loyalty_tier: 'bronze',
-          total_orders: 0,
-          total_spent: 0,
+          wallet_balance: 0,
+          language: 'en',
+          status: 'active',
           created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         } as Customer;
       }
 
+      console.log('Customer created successfully:', createdCustomer);
       return createdCustomer as Customer;
     } catch (error) {
       console.error('Error syncing customer:', error);
       return null;
+    }
+  };
+
+  // Refresh customer data from database
+  const refreshCustomer = async () => {
+    if (!firebaseUser?.email) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('tenant_id', TENANT_ID)
+        .eq('email', firebaseUser.email)
+        .single();
+      
+      if (data && !error) {
+        setCustomer(data as Customer);
+      }
+    } catch (err) {
+      console.error('Error refreshing customer:', err);
     }
   };
 
@@ -192,14 +222,17 @@ export const CustomerAuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateProfile = async (updates: Partial<Customer>) => {
-    if (!customer) {
+    if (!customer || !customer.id) {
       return { error: new Error('Not authenticated') };
     }
 
     try {
       const { data, error } = await supabase
         .from('customers')
-        .update(updates)
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', customer.id)
         .select()
         .single();
@@ -229,6 +262,7 @@ export const CustomerAuthProvider = ({ children }: { children: ReactNode }) => {
         signUp,
         signOut,
         updateProfile,
+        refreshCustomer,
       }}
     >
       {children}
