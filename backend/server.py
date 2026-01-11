@@ -410,89 +410,146 @@ async def create_order(request: CreateOrderRequest):
 
 
 @api_router.get("/payment/verify/{charge_ref}")
-async def verify_payment(charge_ref: str):
-    """Verify payment status and create order if successful"""
+async def verify_payment_old(charge_ref: str):
+    """Legacy endpoint - redirects to new verify endpoint"""
+    return await verify_payment_new(tap_id=None, ref=charge_ref)
+
+
+@api_router.get("/payment/verify")
+async def verify_payment_new(tap_id: Optional[str] = None, ref: Optional[str] = None):
+    """
+    Verify payment status and create order if successful.
+    
+    Tap redirects back with tap_id parameter - this is the actual charge ID.
+    We also pass our ref parameter for looking up stored order data.
+    """
     try:
-        # Get pending payment data
-        pending = pending_payments.get(charge_ref)
-        if not pending:
-            return {
-                "success": False,
-                "status": "not_found",
-                "message": "Payment reference not found or expired"
-            }
+        logging.info(f"Payment verification request: tap_id={tap_id}, ref={ref}")
         
-        charge_id = pending.get('charge_id')
-        if not charge_id:
-            return {
-                "success": False,
-                "status": "no_charge",
-                "message": "No charge ID found"
-            }
-        
-        # Verify charge with Tap API
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(
-                f"https://api.tap.company/v2/charges/{charge_id}",
-                headers={
-                    "Authorization": f"Bearer {TAP_SECRET_KEY}",
-                    "accept": "application/json"
-                }
-            )
-            
-            if response.status_code != 200:
-                logging.error(f"Tap verification failed: {response.text}")
-                return {
-                    "success": False,
-                    "status": "verification_failed",
-                    "message": "Could not verify payment"
-                }
-            
-            charge_data = response.json()
-            charge_status = charge_data.get('status', '').upper()
-            transaction_id = charge_data.get('id')
-            
-            logging.info(f"Tap charge {charge_id} status: {charge_status}")
-            
-            # Check if payment was successful
-            if charge_status == 'CAPTURED':
-                # Create order in database
-                order_request = CreateOrderRequest(**pending['order_data'])
-                result = await create_order_in_db(
-                    order_request, 
-                    payment_status='paid',
-                    transaction_id=transaction_id
+        # If we have tap_id from Tap, use it directly to verify
+        if tap_id:
+            # Verify charge with Tap API using the tap_id (charge_id)
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    f"https://api.tap.company/v2/charges/{tap_id}",
+                    headers={
+                        "Authorization": f"Bearer {TAP_SECRET_KEY}",
+                        "accept": "application/json"
+                    }
                 )
                 
-                # Remove from pending
-                del pending_payments[charge_ref]
+                logging.info(f"Tap API response status: {response.status_code}")
                 
-                return {
-                    "success": True,
-                    "status": "paid",
-                    "order_id": result['id'],
-                    "order_number": result['order_number'],
-                    "transaction_id": transaction_id,
-                    "message": "Payment successful! Order created."
-                }
-            
-            elif charge_status in ['CANCELLED', 'FAILED', 'DECLINED', 'RESTRICTED', 'VOID', 'TIMEDOUT']:
+                if response.status_code != 200:
+                    logging.error(f"Tap verification failed: {response.text}")
+                    return {
+                        "success": False,
+                        "status": "verification_failed",
+                        "message": "Could not verify payment with Tap"
+                    }
+                
+                charge_data = response.json()
+                charge_status = charge_data.get('status', '').upper()
+                transaction_id = charge_data.get('id')
+                
+                # Get our reference from the charge metadata or reference
+                charge_ref = charge_data.get('reference', {}).get('order') or charge_data.get('metadata', {}).get('charge_ref') or ref
+                
+                logging.info(f"Tap charge {tap_id} status: {charge_status}, ref: {charge_ref}")
+                
+                # Check if payment was successful
+                if charge_status == 'CAPTURED':
+                    # Look up pending order data
+                    pending = pending_payments.get(charge_ref) if charge_ref else None
+                    
+                    if pending and 'order_data' in pending:
+                        # Create order in database
+                        order_request = CreateOrderRequest(**pending['order_data'])
+                        result = await create_order_in_db(
+                            order_request, 
+                            payment_status='paid',
+                            transaction_id=transaction_id,
+                            provider_response=charge_data
+                        )
+                        
+                        # Remove from pending
+                        if charge_ref and charge_ref in pending_payments:
+                            del pending_payments[charge_ref]
+                        
+                        return {
+                            "success": True,
+                            "status": "paid",
+                            "order_id": result['id'],
+                            "order_number": result['order_number'],
+                            "transaction_id": transaction_id,
+                            "message": "Payment successful! Order created."
+                        }
+                    else:
+                        # Payment successful but no pending data - might be webhook race
+                        logging.warning(f"Payment CAPTURED but no pending data found for ref: {charge_ref}")
+                        return {
+                            "success": True,
+                            "status": "paid",
+                            "order_id": "",
+                            "order_number": "",
+                            "transaction_id": transaction_id,
+                            "message": "Payment successful! Order will be processed shortly."
+                        }
+                
+                elif charge_status in ['CANCELLED', 'FAILED', 'DECLINED', 'RESTRICTED', 'VOID', 'TIMEDOUT', 'ABANDONED']:
+                    return {
+                        "success": False,
+                        "status": "failed",
+                        "message": f"Payment {charge_status.lower()}. Please try again."
+                    }
+                
+                elif charge_status in ['INITIATED', 'IN_PROGRESS']:
+                    return {
+                        "success": False,
+                        "status": "pending",
+                        "message": "Payment is still being processed"
+                    }
+                
+                else:
+                    logging.warning(f"Unknown charge status: {charge_status}")
+                    return {
+                        "success": False,
+                        "status": "pending",
+                        "message": f"Payment status: {charge_status}"
+                    }
+        
+        # Fallback: Try using ref to look up stored charge_id
+        elif ref:
+            pending = pending_payments.get(ref)
+            if not pending:
                 return {
                     "success": False,
-                    "status": "failed",
-                    "message": f"Payment {charge_status.lower()}. Please try again."
+                    "status": "not_found",
+                    "message": "Payment reference not found or expired"
                 }
             
-            else:
-                # Still pending or unknown status
+            charge_id = pending.get('charge_id')
+            if not charge_id:
                 return {
                     "success": False,
-                    "status": "pending",
-                    "message": "Payment is still being processed"
+                    "status": "no_charge",
+                    "message": "No charge ID found for this reference"
                 }
+            
+            # Recursively call with tap_id
+            return await verify_payment_new(tap_id=charge_id, ref=ref)
+        
+        else:
+            return {
+                "success": False,
+                "status": "invalid",
+                "message": "No payment reference provided"
+            }
                 
     except Exception as e:
         logging.error(f"Payment verification error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return {
             "success": False,
             "status": "error",
