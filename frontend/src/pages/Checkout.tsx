@@ -69,6 +69,58 @@ const Checkout = () => {
     };
     fetchDeliveryFee();
   }, [isPickup]);
+
+  // Loyalty settings
+  interface LoyaltySettings {
+    enabled: boolean;
+    points_per_kwd: number;
+    redemption_rate: number;
+    min_points_to_redeem: number;
+    max_redemption_percent: number;
+  }
+  
+  const [loyaltySettings, setLoyaltySettings] = useState<LoyaltySettings | null>(null);
+  const [usePoints, setUsePoints] = useState(false);
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
+  
+  // Fetch loyalty settings
+  useEffect(() => {
+    const fetchLoyaltySettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('loyalty_settings')
+          .select('*')
+          .eq('tenant_id', TENANT_ID)
+          .single();
+        
+        if (data && !error) {
+          setLoyaltySettings(data);
+        }
+      } catch (err) {
+        console.error('Error fetching loyalty settings:', err);
+      }
+    };
+    fetchLoyaltySettings();
+  }, []);
+  
+  // Calculate loyalty discount
+  const customerPoints = customer?.loyalty_points || 0;
+  const pointValue = loyaltySettings?.redemption_rate || 0.01;
+  const maxRedeemPercent = loyaltySettings?.max_redemption_percent || 100;
+  const minPointsToRedeem = loyaltySettings?.min_points_to_redeem || 0;
+  
+  // Maximum discount based on points and order total
+  const orderTotal = subtotal - discount + (isPickup ? 0 : deliveryFee);
+  const maxDiscountFromPercent = (orderTotal * maxRedeemPercent) / 100;
+  const maxDiscountFromPoints = customerPoints * pointValue;
+  const maxLoyaltyDiscount = Math.min(maxDiscountFromPercent, maxDiscountFromPoints);
+  
+  const loyaltyDiscount = usePoints ? Math.min(pointsToRedeem * pointValue, maxLoyaltyDiscount) : 0;
+  const finalTotal = orderTotal - loyaltyDiscount;
+  
+  // Points to earn from this order
+  const pointsPerKwd = loyaltySettings?.points_per_kwd || 1;
+  const pointsToEarn = Math.floor(finalTotal * pointsPerKwd);
   
   const [formData, setFormData] = useState({
     firstName: customer?.name?.split(' ')[0] || '',
