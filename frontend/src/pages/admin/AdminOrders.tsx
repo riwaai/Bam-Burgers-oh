@@ -340,8 +340,38 @@ const AdminOrders = () => {
         <head>
           <title>Receipt - ${selectedOrder?.order_number}</title>
           <style>
-            body { font-family: monospace; margin: 0; padding: 20px; }
-            @media print { body { padding: 0; } }
+            @page {
+              size: 80mm auto;
+              margin: 0;
+            }
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
+            body {
+              font-family: 'Courier New', monospace;
+              font-size: 12px;
+              width: 80mm;
+              max-width: 80mm;
+              margin: 0 auto;
+              padding: 5mm;
+              background: white;
+              color: black;
+            }
+            .print-receipt {
+              width: 100% !important;
+              max-width: 100% !important;
+            }
+            @media print {
+              body {
+                padding: 0;
+                width: 80mm;
+              }
+              .print-receipt {
+                width: 100% !important;
+              }
+            }
           </style>
         </head>
         <body>${printContent.innerHTML}</body>
