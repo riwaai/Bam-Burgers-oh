@@ -30,7 +30,7 @@ interface MenuItem {
   name_ar: string;
   description_en?: string;
   description_ar?: string;
-  price: number;
+  base_price: number;
   image_url?: string;
   status: string;
   sort_order: number;
