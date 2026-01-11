@@ -181,6 +181,7 @@ const AdminOrders = () => {
         .from('orders')
         .select('*')
         .eq('tenant_id', TENANT_ID)
+        .neq('payment_status', 'payment_pending')  // Filter out pending payment orders
         .order('created_at', { ascending: false })
         .limit(100);
       
@@ -215,7 +216,18 @@ const AdminOrders = () => {
             })
           );
           
-          // Fetch payment info
+          // Fetch payment info OR use transaction_id from order
+          let paymentInfo = null;
+          if (order.transaction_id) {
+            // Use transaction_id directly from order
+            paymentInfo = {
+              transaction_id: order.transaction_id,
+              provider: 'tap',
+              status: 'completed'
+            };
+          }
+          
+          // Also try to get from payments table
           const { data: payments } = await supabase
             .from('payments')
             .select('id, transaction_id, amount, status, provider')
