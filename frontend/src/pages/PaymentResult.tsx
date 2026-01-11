@@ -27,27 +27,30 @@ const PaymentResult = () => {
   
   // Tap sends tap_id in the redirect URL - this is the charge ID
   const tapId = searchParams.get('tap_id');
-  // Our custom ref for looking up stored order data
+  // Our order_id for looking up the order
+  const orderId = searchParams.get('order_id');
+  // Legacy ref parameter
   const chargeRef = searchParams.get('ref');
 
   useEffect(() => {
     const verifyPayment = async () => {
-      // We need either tap_id (from Tap redirect) or ref (our reference)
-      if (!tapId && !chargeRef) {
+      // We need either tap_id (from Tap redirect) or order_id
+      if (!tapId && !orderId && !chargeRef) {
         setStatus('failed');
         setOrderData({ message: 'Invalid payment reference' });
         return;
       }
 
       try {
-        // Build verification URL with both parameters
+        // Build verification URL with all parameters
         let verifyUrl = `${BACKEND_URL}/api/payment/verify`;
         const params = new URLSearchParams();
         if (tapId) params.append('tap_id', tapId);
+        if (orderId) params.append('order_id', orderId);
         if (chargeRef) params.append('ref', chargeRef);
         verifyUrl += `?${params.toString()}`;
         
-        console.log('Verifying payment:', { tapId, chargeRef });
+        console.log('Verifying payment:', { tapId, orderId, chargeRef });
         
         const response = await fetch(verifyUrl);
         const result = await response.json();
