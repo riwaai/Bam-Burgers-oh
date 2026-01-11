@@ -612,6 +612,26 @@ const AdminOrders = () => {
                     <span>Total</span>
                     <span className="text-primary">{(selectedOrder.total_amount || 0).toFixed(3)} KWD</span>
                   </div>
+                  
+                  {/* Payment Info */}
+                  {selectedOrder.payment_status === 'paid' && (
+                    <div className="mt-3 p-3 bg-green-50 rounded-lg">
+                      <p className="text-sm font-medium text-green-700 flex items-center gap-2">
+                        <Check className="h-4 w-4" />
+                        Paid via Online Payment
+                      </p>
+                      {selectedOrder.payment?.transaction_id && (
+                        <p className="text-xs text-green-600 mt-1 font-mono">
+                          Transaction ID: {selectedOrder.payment.transaction_id}
+                        </p>
+                      )}
+                      {selectedOrder.payment?.provider && (
+                        <p className="text-xs text-green-600 capitalize">
+                          Provider: {selectedOrder.payment.provider}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
                 
                 {/* Status Update */}
