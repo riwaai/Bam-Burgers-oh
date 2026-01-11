@@ -382,7 +382,7 @@ const AdminMenu = () => {
                         <Badge variant={item.status === 'active' ? 'default' : 'secondary'}>
                           {item.status}
                         </Badge>
-                        {item.is_popular && <Badge className="bg-yellow-500">Popular</Badge>}
+                        {item.status !== 'active' && <Badge variant="secondary">Inactive</Badge>}
                       </div>
                     </div>
                     <DropdownMenu>
