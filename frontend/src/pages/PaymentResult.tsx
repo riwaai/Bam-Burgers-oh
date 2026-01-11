@@ -25,19 +25,31 @@ const PaymentResult = () => {
   }>({});
   const [verificationAttempts, setVerificationAttempts] = useState(0);
   
-  const chargeRef = searchParams.get('ref');
+  // Tap sends tap_id in the redirect URL - this is the charge ID
   const tapId = searchParams.get('tap_id');
+  // Our custom ref for looking up stored order data
+  const chargeRef = searchParams.get('ref');
 
   useEffect(() => {
     const verifyPayment = async () => {
-      if (!chargeRef) {
+      // We need either tap_id (from Tap redirect) or ref (our reference)
+      if (!tapId && !chargeRef) {
         setStatus('failed');
         setOrderData({ message: 'Invalid payment reference' });
         return;
       }
 
       try {
-        const response = await fetch(`${BACKEND_URL}/api/payment/verify/${chargeRef}`);
+        // Build verification URL with both parameters
+        let verifyUrl = `${BACKEND_URL}/api/payment/verify`;
+        const params = new URLSearchParams();
+        if (tapId) params.append('tap_id', tapId);
+        if (chargeRef) params.append('ref', chargeRef);
+        verifyUrl += `?${params.toString()}`;
+        
+        console.log('Verifying payment:', { tapId, chargeRef });
+        
+        const response = await fetch(verifyUrl);
         const result = await response.json();
         
         console.log('Payment verification result:', result);
@@ -53,7 +65,7 @@ const PaymentResult = () => {
           });
           // Clear cart on successful payment
           clearCart();
-        } else if (result.status === 'pending' && verificationAttempts < 3) {
+        } else if (result.status === 'pending' && verificationAttempts < 5) {
           // Payment still processing, retry after a delay
           setTimeout(() => {
             setVerificationAttempts(prev => prev + 1);
@@ -75,7 +87,7 @@ const PaymentResult = () => {
     if (status === 'verifying') {
       verifyPayment();
     }
-  }, [chargeRef, verificationAttempts, status, clearCart]);
+  }, [tapId, chargeRef, verificationAttempts, status, clearCart]);
 
   const handleBackToCheckout = () => {
     // Navigate back to checkout - cart is preserved since we didn't clear it
