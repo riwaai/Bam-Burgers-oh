@@ -34,7 +34,6 @@ interface MenuItem {
   image_url?: string;
   status: string;
   sort_order: number;
-  is_popular?: boolean;
 }
 
 const AdminMenu = () => {
