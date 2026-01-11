@@ -325,29 +325,32 @@ async def create_order(request: CreateOrderRequest):
                 requires_payment=False
             )
         
-        # For online payment, create Tap charge first (don't create order yet)
-        frontend_url = os.environ.get('FRONTEND_URL', 'https://eatbam.me')
-        charge_ref = str(uuid.uuid4())
+        # For online payment, create order with payment_pending status first
+        # Then create the Tap charge with the order_id
+        frontend_url = os.environ.get('FRONTEND_URL', 'https://order-genius-6.preview.emergentagent.com')
         
-        # Store order data temporarily
-        pending_payments[charge_ref] = {
-            'order_data': request.dict(),
-            'created_at': datetime.utcnow().isoformat()
-        }
+        # Create order with payment_pending status (won't show in admin until payment confirmed)
+        order_result = await create_order_in_db(request, payment_status='payment_pending')
+        order_id = order_result['id']
+        order_number = order_result['order_number']
         
+        logging.info(f"Created pending payment order: {order_id} - {order_number}")
+        
+        # Create Tap charge with order_id in metadata
         charge_data = {
-            "amount": request.total_amount,
+            "amount": float(request.total_amount),
             "currency": "KWD",
             "customer_initiated": True,
             "threeDSecure": True,
             "save_card": False,
-            "description": f"Bam Burgers Order",
+            "description": f"Bam Burgers Order #{order_number}",
             "metadata": {
-                "charge_ref": charge_ref
+                "order_id": order_id,
+                "order_number": order_number
             },
             "reference": {
-                "transaction": charge_ref,
-                "order": charge_ref
+                "transaction": order_id,
+                "order": order_number
             },
             "receipt": {
                 "email": True,
@@ -369,7 +372,7 @@ async def create_order(request: CreateOrderRequest):
                 "id": "src_all"
             },
             "redirect": {
-                "url": f"{frontend_url}/payment-result?ref={charge_ref}"
+                "url": f"{frontend_url}/payment-result?order_id={order_id}"
             }
         }
         
@@ -389,27 +392,31 @@ async def create_order(request: CreateOrderRequest):
                 payment_url = result.get('transaction', {}).get('url')
                 charge_id = result.get('id')
                 
-                # Update pending payment with charge_id
-                pending_payments[charge_ref]['charge_id'] = charge_id
-                
-                logging.info(f"Tap charge created: {charge_id} for ref {charge_ref}")
+                logging.info(f"Tap charge created: {charge_id} for order {order_id}")
                 
                 return OrderResponse(
-                    id=charge_ref,  # This is the reference, not order_id yet
-                    order_number="",  # Will be assigned after payment
+                    id=order_id,
+                    order_number=order_number,
                     status='awaiting_payment',
-                    created_at=datetime.utcnow().isoformat(),
+                    created_at=order_result['created_at'],
                     payment_url=payment_url,
                     requires_payment=True
                 )
             else:
                 logging.error(f"Tap charge failed: {response.text}")
+                # Delete the pending order since payment initiation failed
+                try:
+                    await supabase_request('DELETE', 'orders', params={'id': f'eq.{order_id}'})
+                except:
+                    pass
                 raise HTTPException(status_code=400, detail="Payment initiation failed")
                 
     except HTTPException:
         raise
     except Exception as e:
         logging.error(f"Error creating order: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
