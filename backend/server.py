@@ -423,19 +423,19 @@ async def create_order(request: CreateOrderRequest):
 @api_router.get("/payment/verify/{charge_ref}")
 async def verify_payment_old(charge_ref: str):
     """Legacy endpoint - redirects to new verify endpoint"""
-    return await verify_payment_new(tap_id=None, ref=charge_ref)
+    return await verify_payment_new(tap_id=None, ref=charge_ref, order_id=None)
 
 
 @api_router.get("/payment/verify")
-async def verify_payment_new(tap_id: Optional[str] = None, ref: Optional[str] = None):
+async def verify_payment_new(tap_id: Optional[str] = None, ref: Optional[str] = None, order_id: Optional[str] = None):
     """
-    Verify payment status and create order if successful.
+    Verify payment status and update order if successful.
     
-    Tap redirects back with tap_id parameter - this is the actual charge ID.
-    We also pass our ref parameter for looking up stored order data.
+    New approach: Order is already created with payment_pending status.
+    On successful payment, we update the order to paid status.
     """
     try:
-        logging.info(f"Payment verification request: tap_id={tap_id}, ref={ref}")
+        logging.info(f"Payment verification request: tap_id={tap_id}, ref={ref}, order_id={order_id}")
         
         # If we have tap_id from Tap, use it directly to verify
         if tap_id:
@@ -463,41 +463,73 @@ async def verify_payment_new(tap_id: Optional[str] = None, ref: Optional[str] = 
                 charge_status = charge_data.get('status', '').upper()
                 transaction_id = charge_data.get('id')
                 
-                # Get our reference from the charge metadata or reference
-                charge_ref = charge_data.get('reference', {}).get('order') or charge_data.get('metadata', {}).get('charge_ref') or ref
+                # Get order_id from charge metadata or reference
+                charge_order_id = charge_data.get('metadata', {}).get('order_id') or charge_data.get('reference', {}).get('transaction') or order_id
+                charge_order_number = charge_data.get('metadata', {}).get('order_number') or charge_data.get('reference', {}).get('order')
                 
-                logging.info(f"Tap charge {tap_id} status: {charge_status}, ref: {charge_ref}")
+                logging.info(f"Tap charge {tap_id} status: {charge_status}, order_id: {charge_order_id}")
                 
                 # Check if payment was successful
                 if charge_status == 'CAPTURED':
-                    # Look up pending order data
-                    pending = pending_payments.get(charge_ref) if charge_ref else None
-                    
-                    if pending and 'order_data' in pending:
-                        # Create order in database
-                        order_request = CreateOrderRequest(**pending['order_data'])
-                        result = await create_order_in_db(
-                            order_request, 
-                            payment_status='paid',
-                            transaction_id=transaction_id,
-                            provider_response=charge_data
-                        )
-                        
-                        # Remove from pending
-                        if charge_ref and charge_ref in pending_payments:
-                            del pending_payments[charge_ref]
-                        
-                        return {
-                            "success": True,
-                            "status": "paid",
-                            "order_id": result['id'],
-                            "order_number": result['order_number'],
-                            "transaction_id": transaction_id,
-                            "message": "Payment successful! Order created."
-                        }
+                    if charge_order_id:
+                        # Update the existing order to paid status
+                        try:
+                            update_data = {
+                                'payment_status': 'paid',
+                                'status': 'pending',  # Now it's a real pending order
+                                'transaction_id': transaction_id,
+                                'updated_at': datetime.utcnow().isoformat()
+                            }
+                            await supabase_request('PATCH', 'orders', data=update_data, params={'id': f'eq.{charge_order_id}'})
+                            logging.info(f"Order {charge_order_id} updated to paid status")
+                            
+                            # Create payment record
+                            payment_data = {
+                                'id': str(uuid.uuid4()),
+                                'order_id': charge_order_id,
+                                'payment_method': 'online',
+                                'provider': 'tap',
+                                'amount': charge_data.get('amount', 0),
+                                'currency': 'KWD',
+                                'status': 'completed',
+                                'transaction_id': transaction_id,
+                                'provider_response': charge_data,
+                                'completed_at': datetime.utcnow().isoformat(),
+                            }
+                            try:
+                                await supabase_request('POST', 'payments', data=payment_data)
+                                logging.info(f"Payment record created for order {charge_order_id}")
+                            except Exception as e:
+                                logging.warning(f"Could not create payment record: {e}")
+                            
+                            # Get the order number if we don't have it
+                            if not charge_order_number:
+                                orders = await supabase_request('GET', 'orders', params={'id': f'eq.{charge_order_id}', 'select': 'order_number'})
+                                if orders:
+                                    charge_order_number = orders[0].get('order_number')
+                            
+                            return {
+                                "success": True,
+                                "status": "paid",
+                                "order_id": charge_order_id,
+                                "order_number": charge_order_number or "",
+                                "transaction_id": transaction_id,
+                                "message": "Payment successful! Order confirmed."
+                            }
+                        except Exception as e:
+                            logging.error(f"Failed to update order: {e}")
+                            import traceback
+                            traceback.print_exc()
+                            return {
+                                "success": True,
+                                "status": "paid",
+                                "order_id": charge_order_id,
+                                "order_number": charge_order_number or "",
+                                "transaction_id": transaction_id,
+                                "message": "Payment successful but order update failed. Contact support."
+                            }
                     else:
-                        # Payment successful but no pending data - might be webhook race
-                        logging.warning(f"Payment CAPTURED but no pending data found for ref: {charge_ref}")
+                        logging.warning(f"Payment CAPTURED but no order_id found in charge data")
                         return {
                             "success": True,
                             "status": "paid",
@@ -508,6 +540,14 @@ async def verify_payment_new(tap_id: Optional[str] = None, ref: Optional[str] = 
                         }
                 
                 elif charge_status in ['CANCELLED', 'FAILED', 'DECLINED', 'RESTRICTED', 'VOID', 'TIMEDOUT', 'ABANDONED']:
+                    # Delete the pending order since payment failed
+                    if charge_order_id:
+                        try:
+                            await supabase_request('DELETE', 'orders', params={'id': f'eq.{charge_order_id}'})
+                            logging.info(f"Deleted failed payment order: {charge_order_id}")
+                        except Exception as e:
+                            logging.warning(f"Could not delete failed order: {e}")
+                    
                     return {
                         "success": False,
                         "status": "failed",
@@ -529,26 +569,33 @@ async def verify_payment_new(tap_id: Optional[str] = None, ref: Optional[str] = 
                         "message": f"Payment status: {charge_status}"
                     }
         
-        # Fallback: Try using ref to look up stored charge_id
-        elif ref:
-            pending = pending_payments.get(ref)
-            if not pending:
+        # If we have order_id but no tap_id, we need to find the charge
+        elif order_id:
+            # The order exists - check its payment status
+            orders = await supabase_request('GET', 'orders', params={'id': f'eq.{order_id}', 'select': '*'})
+            if orders:
+                order = orders[0]
+                if order.get('payment_status') == 'paid':
+                    return {
+                        "success": True,
+                        "status": "paid",
+                        "order_id": order_id,
+                        "order_number": order.get('order_number', ''),
+                        "transaction_id": order.get('transaction_id', ''),
+                        "message": "Payment already confirmed!"
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "status": "pending",
+                        "message": "Waiting for payment verification. Please check with Tap."
+                    }
+            else:
                 return {
                     "success": False,
                     "status": "not_found",
-                    "message": "Payment reference not found or expired"
+                    "message": "Order not found"
                 }
-            
-            charge_id = pending.get('charge_id')
-            if not charge_id:
-                return {
-                    "success": False,
-                    "status": "no_charge",
-                    "message": "No charge ID found for this reference"
-                }
-            
-            # Recursively call with tap_id
-            return await verify_payment_new(tap_id=charge_id, ref=ref)
         
         else:
             return {
