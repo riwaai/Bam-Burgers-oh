@@ -48,6 +48,7 @@ const AdminZones = () => {
       const { data, error } = await supabase
         .from('delivery_zones')
         .select('*')
+        .eq('branch_id', BRANCH_ID)
         .order('zone_name', { ascending: true });
 
       if (error) throw error;
