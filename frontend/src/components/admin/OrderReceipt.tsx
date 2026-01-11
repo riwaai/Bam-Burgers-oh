@@ -58,6 +58,18 @@ const formatKuwaitDate = (dateStr: string) => {
   });
 };
 
+// Get current time in user's local timezone
+const getCurrentTime = () => {
+  return new Date().toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+};
+
 const OrderReceipt: React.FC<OrderReceiptProps> = ({ order }) => {
   const formatAddress = (address: any) => {
     if (!address) return '';
