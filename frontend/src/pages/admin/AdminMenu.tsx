@@ -186,7 +186,6 @@ const AdminMenu = () => {
             image_url: itemForm.image_url || null,
             status: itemForm.status,
             sort_order: itemForm.sort_order,
-            is_popular: itemForm.is_popular,
             updated_at: new Date().toISOString(),
           })
           .eq('id', editingItem.id);
@@ -207,7 +206,6 @@ const AdminMenu = () => {
             image_url: itemForm.image_url || null,
             status: itemForm.status,
             sort_order: itemForm.sort_order || items.length + 1,
-            is_popular: itemForm.is_popular,
           });
 
         if (error) throw error;
