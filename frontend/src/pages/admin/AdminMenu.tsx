@@ -627,8 +627,8 @@ const AdminMenu = () => {
                 <Input
                   type="number"
                   step="0.001"
-                  value={itemForm.price}
-                  onChange={(e) => setItemForm({ ...itemForm, price: parseFloat(e.target.value) || 0 })}
+                  value={itemForm.base_price}
+                  onChange={(e) => setItemForm({ ...itemForm, base_price: parseFloat(e.target.value) || 0 })}
                 />
               </div>
               <div className="space-y-2">
