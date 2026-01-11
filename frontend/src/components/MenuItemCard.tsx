@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Plus, Flame } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,7 +30,7 @@ const MenuItemCard = ({ item }: MenuItemCardProps) => {
   return (
     <>
       <Card 
-        className="menu-card cursor-pointer group"
+        className="menu-card cursor-pointer group overflow-hidden"
         onClick={handleClick}
       >
         <div className="relative aspect-[4/3] overflow-hidden">
@@ -43,13 +43,6 @@ const MenuItemCard = ({ item }: MenuItemCardProps) => {
               (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500';
             }}
           />
-          {/* Popular Badge */}
-          <div className="absolute top-3 left-3 flex flex-col gap-2">
-            <Badge className="bg-primary text-primary-foreground shadow-md">
-              <Flame className="h-3 w-3 mr-1" />
-              {t.menu.popular}
-            </Badge>
-          </div>
           {!isAvailable && (
             <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
               <Badge variant="secondary" className="text-base">
@@ -58,7 +51,7 @@ const MenuItemCard = ({ item }: MenuItemCardProps) => {
             </div>
           )}
         </div>
-        <CardContent className="p-4 flex flex-col h-full">
+        <CardContent className="p-4 space-y-3">
           <div className="flex items-start justify-between gap-2">
             <h3 className="font-semibold text-base leading-tight line-clamp-2">
               {displayName}
@@ -70,11 +63,11 @@ const MenuItemCard = ({ item }: MenuItemCardProps) => {
               </span>
             </span>
           </div>
-          <p className="text-sm text-muted-foreground line-clamp-2 flex-grow min-h-[2.5rem]">
+          <p className="text-sm text-muted-foreground line-clamp-2">
             {displayDescription || ''}
           </p>
           <Button 
-            className="w-full mt-3" 
+            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" 
             size="sm"
             disabled={!isAvailable}
           >
