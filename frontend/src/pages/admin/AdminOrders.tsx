@@ -234,10 +234,13 @@ const AdminOrders = () => {
             .eq('order_id', order.id)
             .limit(1);
           
+          // Use payment info from payments table if available, otherwise use from order
+          const finalPayment = (payments && payments.length > 0) ? payments[0] : paymentInfo;
+          
           return { 
             ...parsedOrder, 
             items: itemsWithModifiers,
-            payment: payments && payments.length > 0 ? payments[0] : null
+            payment: finalPayment
           };
         })
       );
