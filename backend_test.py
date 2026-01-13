@@ -10,7 +10,7 @@ import sys
 from datetime import datetime
 
 # Backend URL from the review request
-BASE_URL = "https://order-genius-6.preview.emergentagent.com"
+BASE_URL = "https://bamburgers-fix.preview.emergentagent.com"
 API_URL = f"{BASE_URL}/api"
 
 def test_api_endpoint(method, endpoint, data=None, params=None, expected_status=200):

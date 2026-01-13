@@ -1,180 +1,193 @@
 <analysis>**original_problem_statement**:
-The user wants to build a production-ready website and admin panel for Bam Burgers.
+The user's primary goal is to fix the online payment flow for their Bam Burgers website. The original problem was that orders were created before payment was confirmed. While this has been largely addressed, a new issue has emerged: after a successful payment, the order is not appearing in the admin panel.
 
-The immediate goals are:
-1.  **Fix the Online Payment Flow**: The current Tap Payments integration is flawed. Orders are created *before* payment is confirmed. The correct flow should be:
-    *   An order is only saved to the database *after* a successful payment is verified via the Tap API.
-    *   If payment fails or is cancelled, the user must be returned to the checkout page with their cart and form data intact.
-    *   Successful online payments should be recorded in the  table, and the transaction ID should be visible in the admin panel.
-2.  **Fix Admin Panel Order Details**: The admin panel does not show the full delivery address, selected item modifiers, or item-specific notes. All details from the customer's order must be visible to the admin.
-3.  **Fix Admin Order Status Updates**: A persistent Supabase database issue (likely a trigger or policy) prevents the backend from updating order statuses, blocking a core admin function.
-4.  **Implement Full Modifier CRUD**: The admin panel needs a fully functional section to create, read, update, and delete item modifiers and modifier groups (e.g., Add-ons like Extra Patty with a price).
-5.  **Use Live Tap Payments Keys**: The user has provided live keys for Tap Payments and expects a real, non-demo implementation.
+In addition to the payment flow, the user has requested a comprehensive set of fixes and features:
+1.  **UI/UX Fixes**:
+    *   Restore the Add to Cart and Customize buttons on the home page item cards, which were accidentally removed.
+    *   Align the buttons on all item cards for a consistent look.
+    *   Remove all Popular tags from items on the website.
+    *   Add a TikTok social media icon and link to the footer.
+    *   Prefix the phone number input on the checkout page with .
+2.  **Admin Panel Functionality**:
+    *   Fix the inability to add new items from the Menu page.
+    *   Implement functionality to link modifier groups to specific items.
+    *   Ensure the Coupons and Loyalty forms match the database schema (most work done, needs verification).
+    *   Fix the Delivery Zones page so that edits are saved correctly and allow the delivery fee to be customized (defaulting to 0).
+    *   Create a new Customers page to display customer information and loyalty points.
+3.  **Full Loyalty Program Integration (High Priority)**:
+    *   The website's  page must fetch and display real data, not static content.
+    *   Customers must be able to see and optionally apply their loyalty points as a discount during checkout.
+    *   Customers should earn loyalty points after completing an order.
+    *   New user sign-ups via Firebase (Google/Email) must be correctly saved to the Supabase  table.
+4.  **Receipt Printing (High Priority)**:
+    *   The receipt should **auto-print** when an admin clicks Accept on an order.
+    *   The printed receipt format must be fixed to match a provided 80mm thermal printer template.
+    *   Add a Download PNG button for receipts in the admin panel.
+    *   The time on the receipt must be the order's creation time () and be permanent.
+5.  **Geofencing**: Prevent customers from placing delivery orders if their address is outside the defined delivery zones.
 
 **User's preferred language**: English
 
 **what currently exists?**
-*   A Next.js frontend with a FastAPI backend.
-*   The previous MongoDB workaround for order statuses has been removed. The application now exclusively uses Supabase for its database operations.
-*   The admin panel () has pages for Dashboard, Orders, Menu, Coupons, Loyalty, and placeholder pages for Modifiers and Settings.
-*   The checkout page includes a delivery/pickup option and a payment method selector. A preliminary, but incorrect, Tap Payments integration is in place.
-*   The backend has a  endpoint to solve a previous deployment issue.
-*   Live Tap Payments API keys have been configured in the backend's  file.
+*   A Next.js frontend with a FastAPI backend, using Supabase for the database.
+*   A robust but flawed online payment flow using Tap Payments. An order is now created with a  status, and on successful verification via , the status is updated. However, users report orders are still not appearing post-payment.
+*   The admin panel forms for Coupons and Loyalty have been rewritten to better match the database schema.
+*   A new  page and a  utility have been created.
+*   The logic to sync Firebase users to the Supabase  table in  has been corrected but is untested.
+*   A partial, non-functional loyalty points UI has been added to the  page, which has caused the page to go blank.
+*   Auto-print functionality has been added to the Accept button in the admin panel but is untested.
 
 **Last working item**:
-*   **Last item agent was working**: The agent was performing a critical refactor of the backend server () to fix the flawed online payment and order creation logic. The goal was to ensure orders are only created *after* successful payment verification.
+*   **Last item agent was working**: The agent was performing a major implementation of the **Full Loyalty Program**. This involved adding UI to the  page for point redemption, and adding backend logic in  to handle earning and spending points. The agent also implemented an auto-print feature for receipts upon order acceptance.
 *   **Status**: IN PROGRESS
 *   **Agent Testing Done**: N
-*   **Which testing method agent to use?**: backend testing agent
-*   **User Testing Done**: N
+*   **Which testing method agent to use?**: both
+*   **User Testing Done**: N (User reported the  page is now blank, indicating the loyalty implementation is broken).
 
 **All Pending/In progress Issue list**:
-*   Issue 1: (P0) Flawed online payment flow creates orders before payment is confirmed.
-*   Issue 2: (P1) Admin panel does not display full delivery address or order modifiers.
-*   Issue 3: (P2) A persistent Supabase database trigger/policy blocks order status updates.
+*   Issue 1: (P0) The Checkout page is blank/broken after the last attempt to add loyalty program UI.
+*   Issue 2: (P0) Add to Cart / Customize buttons are missing from item cards on the home page (regression).
+*   Issue 3: (P0) After a successful online payment, the order does not appear in the admin panel.
+*   Issue 4: (P1) The full loyalty program is not functional (points earning/redemption, customer sync).
+*   Issue 5: (P1) Receipt auto-printing and formatting for 80mm printers is not working correctly.
+*   Issue 6: (P2) Admins still cannot add new items from the admin menu page.
+*   Issue 7: (P2) Admins cannot link modifier groups to specific items.
+*   Issue 8: (P3) The delivery fee on the checkout page is hardcoded and not fetched from the database.
+*   Issue 9: (P3) Delivery geofencing is not implemented.
 
 **Issues Detail**:
-*   **Issue 1: Flawed online payment flow.**
-    *   **Attempted fixes**: The agent started a major refactor of  to change the logic. The plan is to create the Tap charge first, and only create the order in the database after a successful payment is verified on the callback. This work is half-finished.
+*   **Issue 1: Checkout page is blank.**
+    *   **Attempted fixes**: The agent added state, effects, and UI elements for loyalty points to .
     *   **Next debug checklist**:
-        1.  Complete the backend refactor in  to separate charge creation from order creation.
-        2.  Create a new backend endpoint (e.g., ) that the frontend will call upon return from Tap.
-        3.  This endpoint must take a charge/tap ID, verify the payment status with the Tap API, and if successful, create the order and payment records in Supabase.
-        4.  Update the frontend  page to call this new verification endpoint.
-        5.  Implement logic to redirect the user back to checkout with their cart intact if the verification fails.
-    *   **Why fix this issue and what will be achieved with the fix?**: This is a critical business logic flaw. Fixing it will prevent un-paid orders from entering the system and ensure accurate accounting.
+        1.  Examine  for syntax errors, incorrect hook usage, or rendering loops that are causing the page to crash.
+        2.  Check the browser's developer console on the checkout page to identify the specific React error.
+        3.  Temporarily comment out the newly added loyalty code blocks to confirm they are the cause and restore page functionality before re-implementing correctly.
+    *   **Why fix this issue?**: The checkout page is the most critical step in the user journey. It being broken means no orders can be placed.
     *   **Status**: IN PROGRESS
     *   **Is recurring issue?**: N
-    *   **Should Test frontend/backend/both after fix?**: both
+    *   **Should Test frontend/backend/both after fix?**: frontend
 
-*   **Issue 2: Admin panel does not display full order details.**
-    *   **Attempted fixes**: The agent attempted a fix on the frontend () to parse a JSON string for the . This was insufficient as modifiers and item notes are also missing.
+*   **Issue 2: Menu Item Card buttons are missing on the home page.**
+    *   **Attempted fixes**: The agent overwrote  to fix button alignment and remove a Popular badge. This accidentally removed the buttons from being rendered on the home page.
     *   **Next debug checklist**:
-        1.  Ensure the backend's get order endpoint () joins and returns data from  and .
-        2.  Update the frontend  and  components to correctly parse the  object (which is stored as a JSON string).
-        3.  Update the same components to iterate through and display the  associated with each order item.
-        4.  Display the  field from the order.
-    *   **Why fix this issue and what will be achieved with the fix?**: The kitchen staff cannot prepare orders correctly without seeing all customizations and delivery details.
+        1.  The user's first priority is to Reverse the thing you did in the card buttons. Review the latest version of .
+        2.  Identify the conditional rendering logic or CSS change that is hiding the buttons on .
+        3.  Restore the button container to its previous, working state while preserving the alignment fix if possible.
+    *   **Why fix this issue?**: This is a critical UI regression that prevents users from adding items to their cart directly from the home page.
     *   **Status**: IN PROGRESS
     *   **Is recurring issue?**: Y
     *   **Should Test frontend/backend/both after fix?**: frontend
 
-*   **Issue 3: Supabase trigger/policy blocks order status updates.**
-    *   **Attempted fixes**: The user ran SQL provided by the agent to drop triggers, but a new error emerged: . This points to a different trigger or a  value on the  column that is incompatible with the service role update.
+*   **Issue 3: Orders not appearing in admin panel after successful payment.**
+    *   **Attempted fixes**: The agent implemented a robust flow where a  order is created and then updated upon successful verification. However, this is still failing. The issue might be that the verification callback is not successfully updating the order's  from  to .
     *   **Next debug checklist**:
-        1.  Provide the user with a new SQL script to investigate and fix the root cause. This script should check for  values on the  column and inspect the functions used by any remaining triggers.
-        2.  The likely fix is to remove the  or alter the trigger function.
-    *   **Why fix this issue and what will be achieved with the fix?**: This is a core admin function. Without it, the restaurant cannot manage its order pipeline.
-    *   **Status**: BLOCKED
+        1.  Review the  endpoint in .
+        2.  Check the logic that updates the order status: .
+        3.  Ensure the  clause  is correct and the  is being received correctly.
+        4.  Check backend logs for any errors during the update call after a payment is verified.
+        5.  Confirm that the  fetch query () is still in place and correct.
+    *   **Why fix this issue?**: This is the core business problem. If paid orders don't show up, the business cannot function.
+    *   **Status**: IN PROGRESS
     *   **Is recurring issue?**: Y
     *   **Should Test frontend/backend/both after fix?**: backend
-    *   **Blocked on other issue**: Blocked on user running the correct SQL in their Supabase dashboard.
 
 **In progress Task List**:
-*   **Task 1: (P0) Refactor Payment & Order Creation Logic**
-    *   **Where to resume**: The backend file  has been overwritten with a new structure. The next step is to update the frontend page  to call a new backend verification endpoint.
-    *   **What will be achieved with this?**: A secure and correct payment flow where orders are only created after payment is successfully verified.
+*   **Task 1: (P1) Complete Full Loyalty Program Integration**
+    *   **Where to resume**: After fixing the blank  page, resume implementation. This involves fetching loyalty settings, correctly calculating and applying discounts, and ensuring points are awarded post-order. Also, verify that the  fix works and new users are saved to the  table.
+    *   **What will be achieved with this?**: A complete, functional customer loyalty system as requested by the user.
     *   **Status**: IN PROGRESS
     *   **Should Test frontend/backend/both after fix?**: both
-    *   **Blocked on something**: None.
+    *   **Blocked on something**: Issue 1 (Blank Checkout Page).
 
 **Upcoming and Future Tasks**
 *   **Upcoming Tasks**:
-    *   **(P0) Provide SQL to user to fix the  type mismatch issue.**
-    *   **(P1) Implement Full Modifier Management**: Build out the CRUD functionality in  and the corresponding backend endpoints to manage modifier groups and modifiers.
-    *   **(P2) Implement Admin Settings**: Build the  page to allow admins to update Tap API keys.
+    *   (P1) **Fix and Verify Receipt Printing**: Debug the 80mm print format using  and test the auto-print-on-acceptance feature in .
+    *   (P2) **Fix Admin Add Item**: Debug why item creation fails in  by checking network/backend logs.
+    *   (P2) **Implement Item-Modifier Linking**: Build the UI/UX in  to link modifier groups to items and save the associations in the  table.
+    *   (P3) **Fix Delivery Fee Logic**: Modify  to fetch the delivery fee from the  table based on the customer's address.
 *   **Future Tasks**:
-    *   **(P2) Fix Receipt Printing**: Change the admin panel's Print Receipt function to use the browser's native print dialog () instead of downloading a PNG.
-    *   **(P3) Correct Receipt Time**: Ensure the timestamp on the receipt uses Kuwait Standard Time.
+    *   (P3) **Implement Delivery Geofencing**: Add backend validation to check if a customer's address falls within a defined delivery zone polygon.
+    *   (P4) **Implement Full Firebase Auth**: Implement and test Google Sign-In and Email/OTP, ensuring a seamless login/signup flow that populates the  table.
+    *   (P4) **Create Customer Admin Page**: Build out the  page to display a list of all customers and their details from the  table.
 
 **Completed work in this session**
-*   Fixed the blank checkout page by replacing  with a vanilla Leaflet implementation.
-*   Fixed menu and admin data loading by correcting the  environment variable.
-*   Removed the entire MongoDB fallback system in favor of a pure Supabase backend.
-*   Added a  endpoint to the backend to fix deployment issues.
-*   Implemented a sticky cart footer that navigates to a dedicated  page.
-*   Added a delivery vs. pickup option on the checkout page.
-*   Updated the receipt to remove the logo and change footer text to 'RIWA POS'.
-*   Created placeholder pages for Admin Modifiers and Admin Settings.
-*   Switched from test to live Tap Payments API keys in the backend environment.
-
-**Earlier issues found/mentioned but not fixed**
-*   **Supabase  trigger/policy issue**: A persistent database-level problem that prevents order status updates. The agent identified the error message but has not yet provided the final correct SQL script to the user for resolution.
-
-**Known issue recurrence from previous fork**
-*   **Issue recurrence in previous fork**: The inability to update order statuses in Supabase due to database triggers/policies. The previous workaround (MongoDB) was removed, re-exposing this core issue.
-*   **Recurrence count**: 3+
-*   **Status**: BLOCKED
+- **Payment Flow Refactor**: Re-architected the payment flow to create an order with  status and update it only after successful Tap verification using the correct .
+- **Admin Panel Enhancements**:
+    - Rewrote  and  to remove extraneous fields and align with the DB schema.
+    - Created a placeholder  page and added it to the admin layout.
+    - Fixed  to use the correct .
+    - Added logic to  to display the payment transaction ID.
+- **Receipt System**:
+    - Created a new  utility based on the user's reference code for 80mm thermal printing.
+    - Added a Download PNG function for receipts using .
+    - Implemented a trigger to **auto-print** the receipt when an order is Accepted.
+- **Customer Auth**: Fixed a critical bug in  that prevented new Firebase users from being saved to the Supabase  table.
+- **UI Fixes**: Added a TikTok link to the footer and prefixed the checkout phone number field with .
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
-*   **Frontend**: Next.js (with Vite), React, TypeScript, Tailwind CSS, shadcn/ui.
+*   **Frontend**: React, TypeScript, Vite, Tailwind CSS, shadcn/ui, , .
 *   **Backend**: FastAPI (Python).
 *   **Database**: Supabase (PostgreSQL).
-*   **Payments**: Tap Payments (integration is in-progress and uses live keys).
+*   **Payments**: Tap Payments.
+*   **Authentication**: Firebase (for customers).
+*   **Printing**: Browser print dialog () triggered via JavaScript, with custom CSS for 80mm thermal printers.
 
 **key DB schema**
-*   : { id, ..., delivery_address (text), payment_status, notes, ... }
-*   : { id, order_id, provider, transaction_id, status, provider_response (jsonb) }
-*   : { id, order_id, ... }
-*   : { id, order_item_id, modifier_id, price, ... }
-*    and : Tables for managing item customizations.
-
-**changes in tech stack**
-*   The entire backend architecture was shifted from a Supabase+MongoDB hybrid back to a pure Supabase model, removing all  dependencies and logic.
-*   **Tap Payments** was introduced as the primary payment provider.
+*   : { uid=0(root) gid=0(root) groups=0(root),  ('payment_pending', 'pending'), , ,  }
+*   : { uid=0(root) gid=0(root) groups=0(root), , , ,  }
+*   : { , ,  }
+*   : { , , ,  }
+*   : { ,  }
+*   : {  (jsonb),  }
 
 **All files of reference**
-*   : Core application logic. It is currently in a half-refactored, likely non-functional state regarding the payment flow.
-*   : The page that initiates the online payment process.
-*   : The page that handles the user's return from the Tap payment gateway. It needs to be updated to call the new backend verification logic.
-*   : Displays orders to the admin. Requires fixes to correctly parse and display the full delivery address and modifiers.
-*   : New page that needs to be implemented to provide full CRUD for menu item modifiers.
+*   : Needs to be fixed urgently as it's blank. It's also the focus for the loyalty program UI.
+*   : The source of the missing buttons on the home page. Needs to be reverted/fixed.
+*   : Contains the core logic for order creation and payment verification that needs debugging. It also needs to be completed for the loyalty program.
+*   : Contains the new auto-print logic that needs to be tested and potentially debugged.
+*   : The new receipt generation utility. Its CSS may need refinement to match the user's desired print format.
+*   : The Add Item functionality is broken here.
 
 **Critical Info for New Agent**
-*   **The Payment Flow is Broken**: Your first priority is to fix the payment and order creation process. The backend logic in  was partially refactored. You must complete this by creating a new verification endpoint and updating  to use it. Orders must only be created *after* successful payment verification.
-*   **Provide SQL to Fix Order Updates**: The admin panel cannot update order statuses due to a Supabase  type mismatch error. You must provide the user with a specific SQL script to find and remove the faulty trigger or default value in their database.
-*   **Live API Keys**: The application is configured with the user's **LIVE** Tap Payments keys. Exercise caution.
-*   **Complete Modifier Implementation**: The user requires full CRUD functionality for modifiers and modifier groups, which is currently just a placeholder page. This is a key feature for the restaurant's menu.
+*   **Fix Regressions First**: The user is blocked by two recent regressions. Your first priorities must be:
+    1.  **Fix the missing buttons**: Revert the change in  that caused the Add to Cart buttons to disappear from the home page.
+    2.  **Fix the blank Checkout page**: Debug  to resolve the error that is causing the page to crash.
+*   **Focus on the Payment & Order Flow**: The core problem remains that paid orders are not showing up in the admin panel. After fixing the UI regressions, this should be your highest priority. Investigate the backend  endpoint and the database update call.
+*   **Loyalty Program is the Next Big Task**: Once the critical issues are resolved, the main task is to complete the loyalty program implementation. This is a complex feature involving customer sync, checkout UI, and backend transaction logic.
+*   **Receipts are a High Priority**: The user is very particular about the receipt's format and the auto-print functionality. Use the  utility and the user's provided reference image and code. The auto-print on Accept needs to be thoroughly tested.
 
 **documents and test reports created in this job**
-*   None.
+*   /app/test_result.md
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User**: Admin status update doesn't work on the deployed site.
-2.  **User**: Fix cart footer navigation; add delivery/pickup option; change receipt text.
-3.  **User**: Provide instructions on how I can fix Supabase and edit the frontend myself.
-4.  **User**: Shared deployment logs showing a  endpoint failure.
-5.  **User**: Requested a massive feature update: remove all MongoDB logic, switch fully to Supabase, add full modifier CRUD, and integrate Tap Payments with live keys.
-6.  **User**: Okayed the agent's plan and re-shared Supabase credentials.
-7.  **User**: Admin panel still doesn't show full order details (address, modifiers). The Tap payment flow is wrong; it creates an order even if payment is cancelled.
-8.  **User**: Re-iterated the correct payment flow: order is only created *after* successful payment, and the cart should be preserved on failure.
-9.  **User**: Confirmed the delivery address fix was not needed, but the payment gateway logic is the main remaining problem. Provided detailed schema for  and  tables.
-10. **User**: Acknowledged the agent's plan to fix the payment flow. The current task is a direct result of this message.
+1.  **User (Latest)**: Reports the checkout page is blank. Re-prioritizes work: fix loyalty UI, implement auto-receipt printing on order accepted, and provides a detailed  file from another project as a perfect example for 80mm printing format.
+2.  **User**: Asks agent to reverse the change that removed the red Add to Cart buttons. Asks for delivery fee to be dynamic (default 0). Wants receipt time to be the permanent order creation time. Wants a Download PNG option for receipts. Confirms that fixing the loyalty program (especially customer signup/sync) is the top priority after the button fix.
+3.  **User**: Provides a very long list of issues including broken admin forms (menu, coupons, loyalty), UI bugs (buttons, footer, phone prefix), and feature requests (delivery zones, customer page, Firebase auth, geofencing).
+4.  **User**: Confirms payment is successful but the order doesn't appear in the admin panel. Confirms they added a  to the  table.
+5.  **User**: Reports a real user's payment went through on Tap but showed as failed on the website. This prompted the main refactor to use  for verification.
+6.  *Older messages relate to the initial implementation and fixes for the payment flow, which have since been completed.*
 
 **Project Health Check:**
 *   **Broken**:
-    *   **Online Payment & Order Creation Flow**: Non-functional and in a half-refactored state.
-    *   **Admin Order Status Updates**: Blocked by a database-level issue.
-*   **Mocked/Incomplete**:
-    *   Admin Modifier Management () has no functionality.
-    *   Display of payment transaction details in the admin panel.
+    *   **Checkout Page**: Completely non-functional (blank screen).
+    *   **Home Page Cart Functionality**: Users cannot add items from the home page.
+    *   **Online Order Flow**: Paid orders are not appearing for admins.
+    *   **Admin Item Creation**: Admins cannot add new menu items.
+*   **Mocked**:
+    *   The website  page contains static, hardcoded data.
 
 **3rd Party Integrations**
-*   **Supabase**: Primary database and authentication.
-*   **Tap Payments**: Payment gateway service. Configured with **live keys**.
+*   **Supabase**: Primary database and backend services.
+*   **Tap Payments**: Payment gateway service, configured with live keys.
+*   **Firebase**: Used for customer authentication (Google, Email OTP).
 
 **Testing status**
-*   **Testing agent used after significant changes**: NO
+*   **Testing agent used after significant changes**: YES (for the backend payment flow)
 *   **Troubleshoot agent used after agent stuck in loop**: NO
-*   **Test files created**: None
-*   **Known regressions**: The online payment flow is completely broken due to the incomplete refactor.
-
-**Credentials to test flow:**
-*   **Admin Credentials**: Username: , Password: 
-
-**What agent forgot to execute**
-*   The agent did not complete the critical refactor of the payment processing logic, leaving the application's core ordering feature in a broken state.
-*   The agent did not provide the user with the final, correct SQL script needed to resolve the persistent database issue that is blocking all order status updates from the admin panel.</analysis>
+*   **Test files created**: None.
+*   **Known regressions**:
+    1.  The Add to Cart / Customize buttons on  have disappeared from the home page.
+    2.  The  page is blank and non-functional.</analysis>

@@ -363,7 +363,7 @@ async def create_order(request: CreateOrderRequest):
         
         # For online payment, create order with payment_pending status first
         # Then create the Tap charge with the order_id
-        frontend_url = os.environ.get('FRONTEND_URL', 'https://order-genius-6.preview.emergentagent.com')
+        frontend_url = os.environ.get('FRONTEND_URL', 'https://bamburgers-fix.preview.emergentagent.com')
         
         # Create order with payment_pending status (won't show in admin until payment confirmed)
         order_result = await create_order_in_db(request, payment_status='payment_pending')
