@@ -231,17 +231,29 @@ frontend:
           agent: "main"
           comment: "Implemented full loyalty program in Checkout.tsx: fetches loyalty settings, calculates points to earn/spend, UI for redeeming points with slider, loyalty discount applied to order. Backend server.py handles points update in create_order_in_db function."
 
-  - task: "Payment Result Page - Verification Flow"
+  - task: "Receipt Auto-Print on Order Accept"
     implemented: true
     working: "NA"
-    file: "/app/frontend/src/pages/PaymentResult.tsx"
+    file: "/app/frontend/src/pages/admin/AdminOrders.tsx"
     stuck_count: 0
     priority: "high"
     needs_retesting: true
     status_history:
         - working: "NA"
           agent: "main"
-          comment: "PaymentResult.tsx calls /api/payment/verify/{charge_ref} to verify payment status. Only clears cart on success. Shows failed/cancelled UI with 'Back to Checkout' option if payment fails - cart is preserved."
+          comment: "Auto-print functionality already implemented. When order status updated to 'accepted', printReceipt() is called automatically (line 277-286). Uses receipt.ts utility with proper 80mm thermal printer format based on user's reference code from RIWA POS."
+
+  - task: "Receipt Format - 80mm Thermal Printer"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/utils/receipt.ts"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Receipt utility exists with proper 80mm thermal printer formatting. Uses order.created_at for permanent timestamp, shows customer info, items with modifiers, totals, payment info (transaction_id for online payments). Format matches user's RIWA POS reference."
 
 metadata:
   created_by: "testing_agent"
