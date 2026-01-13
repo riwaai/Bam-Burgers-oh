@@ -190,15 +190,18 @@ backend:
 
   - task: "Loyalty Points Backend Integration"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: "NA"
           agent: "main"
           comment: "Backend handles loyalty points in create_order_in_db (lines 309-339). Fetches current customer points, calculates new balance (current - spent + earned), updates customers table, creates loyalty_transactions record."
+        - working: true
+          agent: "testing"
+          comment: "✅ LOYALTY POINTS INTEGRATION WORKING. Tested POST /api/orders with loyalty_points_used: 50 and loyalty_points_earned: 100 - backend accepts and processes loyalty fields correctly. GET /api/loyalty/settings returns proper configuration (points_per_kwd: 1, redemption_rate: 0.03, enabled: true). Order creation with online payment (Tap) works correctly with payment_url returned and payment_pending status. Admin orders API includes all orders (including payment_pending for admin visibility) with transaction_id for paid orders."
 
 frontend:
   - task: "Checkout Page - Fix Blank Screen"
