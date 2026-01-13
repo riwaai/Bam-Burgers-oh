@@ -344,80 +344,19 @@ const AdminOrders = () => {
   };
 
   const handlePrintReceipt = () => {
-    const printContent = receiptRef.current;
-    if (!printContent) return;
+    if (!selectedOrder) return;
     
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      toast.error('Please allow popups to print');
-      return;
-    }
-    
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Receipt - ${selectedOrder?.order_number}</title>
-          <style>
-            @page {
-              size: 80mm auto;
-              margin: 0;
-            }
-            * {
-              margin: 0;
-              padding: 0;
-              box-sizing: border-box;
-            }
-            body {
-              font-family: 'Courier New', monospace;
-              font-size: 12px;
-              width: 80mm;
-              max-width: 80mm;
-              margin: 0 auto;
-              padding: 5mm;
-              background: white;
-              color: black;
-            }
-            .print-receipt {
-              width: 100% !important;
-              max-width: 100% !important;
-            }
-            @media print {
-              body {
-                padding: 0;
-                width: 80mm;
-              }
-              .print-receipt {
-                width: 100% !important;
-              }
-            }
-          </style>
-        </head>
-        <body>${printContent.innerHTML}</body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.onload = () => {
-      printWindow.print();
-      printWindow.close();
-    };
+    // Use the utility function for consistent formatting
+    printReceipt(selectedOrder as any);
+    toast.success('Receipt sent to printer');
   };
 
   const handleDownloadPNG = async () => {
     const receiptElement = receiptRef.current;
-    if (!receiptElement) return;
+    if (!receiptElement || !selectedOrder) return;
 
     try {
-      const canvas = await html2canvas(receiptElement, {
-        backgroundColor: '#ffffff',
-        scale: 2,
-        logging: false,
-      });
-      
-      const link = document.createElement('a');
-      link.download = `receipt-${selectedOrder?.order_number}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
+      await downloadReceiptPNG(receiptElement, selectedOrder.order_number);
       
       toast.success('Receipt downloaded');
     } catch (err) {
