@@ -207,15 +207,233 @@ def test_loyalty_settings():
         print("✅ Loyalty settings retrieval successful")
         if isinstance(result, dict):
             points_per_kwd = result.get('points_per_kwd')
+            kwd_per_point = result.get('kwd_per_point')
+            redemption_rate = result.get('redemption_rate')
             is_active = result.get('is_active')
             print(f"Points per KWD: {points_per_kwd}")
+            print(f"KWD per point: {kwd_per_point}")
+            print(f"Redemption rate: {redemption_rate}")
             print(f"Loyalty active: {is_active}")
-            return True
+            
+            # Verify required loyalty configuration fields
+            if points_per_kwd and is_active is not None:
+                return True, result
+            else:
+                print("❌ Missing required loyalty configuration fields")
+                return False, None
         else:
             print("❌ Invalid response format")
-            return False
+            return False, None
     else:
         print(f"❌ Loyalty settings retrieval failed: {result}")
+        return False, None
+
+def test_order_creation_with_loyalty_points():
+    """Test 10: Order Creation with Loyalty Points - POST /api/orders"""
+    print("\n" + "="*50)
+    print("TEST 10: Order Creation with Loyalty Points")
+    print("="*50)
+    
+    import uuid
+    
+    # Generate a realistic customer UUID
+    customer_id = str(uuid.uuid4())
+    
+    # Create order data with loyalty points
+    order_data = {
+        "order_type": "delivery",
+        "customer_name": "Mohammed Al-Ahmad",
+        "customer_phone": "+96599123789",
+        "customer_email": "mohammed.ahmad@email.com",
+        "customer_id": customer_id,
+        "delivery_address": {
+            "area": "Salmiya",
+            "block": "8",
+            "street": "Ahmad Al-Jaber Street",
+            "building": "22",
+            "floor": "2",
+            "apartment": "8",
+            "additional_directions": "Near Al-Fanar Mall",
+            "geo_lat": 29.3375,
+            "geo_lng": 48.0758
+        },
+        "delivery_instructions": "Ring the bell twice",
+        "items": [
+            {
+                "item_id": "c3333333-3333-3333-3333-333333333333",
+                "item_name_en": "Big BAM Burger",
+                "item_name_ar": "بيج بام برجر",
+                "quantity": 1,
+                "unit_price": 2.75,
+                "total_price": 2.75,
+                "notes": "Extra cheese",
+                "modifiers": []
+            },
+            {
+                "item_id": "f6666666-6666-6666-6666-666666666666", 
+                "item_name_en": "Large Fries",
+                "item_name_ar": "بطاطس كبيرة",
+                "quantity": 1,
+                "unit_price": 1.25,
+                "total_price": 1.25,
+                "notes": "",
+                "modifiers": []
+            }
+        ],
+        "subtotal": 4.0,
+        "discount_amount": 0.5,  # 50 points used = 0.5 KWD discount
+        "delivery_fee": 1.0,
+        "total_amount": 4.5,  # 4.0 - 0.5 + 1.0
+        "notes": "Test order with loyalty points",
+        "payment_method": "cash",
+        "loyalty_points_used": 50,
+        "loyalty_points_earned": 100
+    }
+    
+    success, result = test_api_endpoint("POST", "/orders", data=order_data, expected_status=200)
+    
+    if success:
+        print("✅ Order creation with loyalty points successful")
+        if isinstance(result, dict):
+            order_id = result.get('id')
+            order_number = result.get('order_number')
+            status = result.get('status')
+            print(f"Order ID: {order_id}")
+            print(f"Order Number: {order_number}")
+            print(f"Status: {status}")
+            print(f"Customer ID used: {customer_id}")
+            print(f"Loyalty points used: 50")
+            print(f"Loyalty points earned: 100")
+            
+            if order_id and order_number:
+                return True, order_id, customer_id
+            else:
+                print("❌ Missing order details in response")
+                return False, None, None
+        else:
+            print("❌ Invalid response format")
+            return False, None, None
+    else:
+        print(f"❌ Order creation with loyalty points failed: {result}")
+        return False, None, None
+
+def test_order_with_online_payment():
+    """Test 11: Order Creation with Online Payment - POST /api/orders"""
+    print("\n" + "="*50)
+    print("TEST 11: Order Creation with Online Payment (Tap)")
+    print("="*50)
+    
+    import uuid
+    
+    # Generate a realistic customer UUID
+    customer_id = str(uuid.uuid4())
+    
+    # Create order data with tap payment method
+    order_data = {
+        "order_type": "delivery",
+        "customer_name": "Fatima Al-Zahra",
+        "customer_phone": "+96599987654",
+        "customer_email": "fatima.zahra@email.com",
+        "customer_id": customer_id,
+        "delivery_address": {
+            "area": "Hawalli",
+            "block": "4",
+            "street": "Tunis Street",
+            "building": "15",
+            "floor": "1",
+            "apartment": "3"
+        },
+        "items": [
+            {
+                "item_id": "d4444444-4444-4444-4444-444444444444",
+                "item_name_en": "Chicken Shawarma",
+                "item_name_ar": "شاورما دجاج",
+                "quantity": 2,
+                "unit_price": 1.95,
+                "total_price": 3.90
+            }
+        ],
+        "subtotal": 3.90,
+        "delivery_fee": 0.75,
+        "total_amount": 4.65,
+        "payment_method": "tap",
+        "loyalty_points_used": 0,
+        "loyalty_points_earned": 46  # Based on 10 points per KWD
+    }
+    
+    success, result = test_api_endpoint("POST", "/orders", data=order_data, expected_status=200)
+    
+    if success:
+        print("✅ Online payment order creation successful")
+        if isinstance(result, dict):
+            requires_payment = result.get('requires_payment')
+            payment_url = result.get('payment_url')
+            order_id = result.get('id')
+            status = result.get('status')
+            
+            print(f"Requires Payment: {requires_payment}")
+            print(f"Payment URL exists: {bool(payment_url)}")
+            print(f"Order ID: {order_id}")
+            print(f"Status: {status}")
+            
+            # Should return payment_url and payment_pending status
+            if requires_payment == True and payment_url and order_id:
+                print("✅ Correct online payment response - has payment_url and order_id")
+                return True, order_id
+            else:
+                print("❌ Missing required payment fields")
+                return False, None
+        else:
+            print("❌ Invalid response format")
+            return False, None
+    else:
+        print(f"❌ Online payment order creation failed: {result}")
+        return False, None
+
+def test_admin_orders_exclude_payment_pending():
+    """Test 12: Admin Orders List excludes payment_pending orders - GET /api/admin/orders"""
+    print("\n" + "="*50)
+    print("TEST 12: Admin Orders List (excludes payment_pending)")
+    print("="*50)
+    
+    success, result = test_api_endpoint("GET", "/admin/orders", expected_status=200)
+    
+    if success:
+        print("✅ Admin orders retrieval successful")
+        if isinstance(result, list):
+            print(f"Number of orders returned: {len(result)}")
+            
+            # Check that no payment_pending orders are included
+            payment_pending_count = 0
+            orders_with_transaction_id = 0
+            
+            for order in result:
+                payment_status = order.get('payment_status')
+                transaction_id = order.get('transaction_id')
+                payment_info = order.get('payment')
+                
+                if payment_status == 'payment_pending':
+                    payment_pending_count += 1
+                
+                if transaction_id or (payment_info and payment_info.get('transaction_id')):
+                    orders_with_transaction_id += 1
+            
+            print(f"Orders with payment_pending status: {payment_pending_count}")
+            print(f"Orders with transaction_id: {orders_with_transaction_id}")
+            
+            if payment_pending_count == 0:
+                print("✅ No payment_pending orders in admin list (correct)")
+                if orders_with_transaction_id > 0:
+                    print("✅ Some orders have transaction_id for paid orders")
+                return True
+            else:
+                print("❌ Found payment_pending orders in admin list (should be excluded)")
+                return False
+        else:
+            print("❌ Expected array of orders")
+            return False
+    else:
+        print(f"❌ Admin orders retrieval failed: {result}")
         return False
 
 def test_payment_verification():
