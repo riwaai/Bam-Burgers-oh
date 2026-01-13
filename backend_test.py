@@ -661,10 +661,27 @@ def main():
     results.append(("Coupon Validation", coupon_success))
     
     # Test 5: Loyalty Settings
-    loyalty_success = test_loyalty_settings()
+    loyalty_success, loyalty_config = test_loyalty_settings()
     results.append(("Loyalty Settings", loyalty_success))
     
-    # NEW PAYMENT TESTS - Focus of this testing session
+    # LOYALTY POINTS INTEGRATION TESTS - Main focus
+    print("\n" + "🔥"*25)
+    print("LOYALTY POINTS INTEGRATION TESTS")
+    print("🔥"*25)
+    
+    # Test 10: Order Creation with Loyalty Points
+    loyalty_order_success, loyalty_order_id, customer_id = test_order_creation_with_loyalty_points()
+    results.append(("Order Creation with Loyalty Points", loyalty_order_success))
+    
+    # Test 11: Order with Online Payment
+    online_payment_success, online_order_id = test_order_with_online_payment()
+    results.append(("Order with Online Payment", online_payment_success))
+    
+    # Test 12: Admin Orders List (excludes payment_pending)
+    admin_orders_exclude_success = test_admin_orders_exclude_payment_pending()
+    results.append(("Admin Orders Exclude Payment Pending", admin_orders_exclude_success))
+    
+    # PAYMENT VERIFICATION FLOW TESTS
     print("\n" + "🔥"*20)
     print("PAYMENT VERIFICATION FLOW TESTS")
     print("🔥"*20)
@@ -701,8 +718,15 @@ def main():
     
     print(f"\nOverall: {passed}/{total} tests passed")
     
+    # Focus on loyalty tests
+    loyalty_tests = results[5:8]  # Tests 5, 10, 11, 12 are loyalty-related
+    loyalty_passed = sum(1 for _, success in loyalty_tests if success)
+    loyalty_total = len(loyalty_tests)
+    
+    print(f"Loyalty Integration Tests: {loyalty_passed}/{loyalty_total} passed")
+    
     # Focus on payment tests
-    payment_tests = results[5:]  # Last 4 tests are payment-related
+    payment_tests = results[8:]  # Last 4 tests are payment-related
     payment_passed = sum(1 for _, success in payment_tests if success)
     payment_total = len(payment_tests)
     
