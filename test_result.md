@@ -188,20 +188,17 @@ backend:
           agent: "testing"
           comment: "✅ Payment Verification API working correctly. GET /api/payment/verify/{charge_ref} returns proper JSON response with success: false, status: 'not_found' for non-existent charge references. Endpoint accessible and responding as expected."
 
-  - task: "Tap Payment Flow - Order Creation Only After Payment"
+  - task: "Loyalty Points Backend Integration"
     implemented: true
-    working: true
+    working: "NA"
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
         - working: "NA"
           agent: "main"
-          comment: "Refactored POST /api/orders to NOT create order when payment_method=tap. Instead, stores order data in pending_payments memory and returns payment_url for Tap redirect. Order only created in DB after payment verification returns CAPTURED status."
-        - working: true
-          agent: "testing"
-          comment: "✅ Tap Payment Flow working correctly. POST /api/orders with payment_method='tap' returns requires_payment: true, valid payment_url (https://checkout.tap.company), and empty order_number (order not created yet). Cash payments create orders immediately with proper order_id and order_number. Admin orders endpoint includes payment info when available."
+          comment: "Backend handles loyalty points in create_order_in_db (lines 309-339). Fetches current customer points, calculates new balance (current - spent + earned), updates customers table, creates loyalty_transactions record."
 
 frontend:
   - task: "Checkout Page - Fix Blank Screen"
