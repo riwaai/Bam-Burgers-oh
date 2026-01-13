@@ -234,6 +234,7 @@ async def create_order_in_db(request: CreateOrderRequest, payment_status: str = 
         'order_type': request.order_type,
         'channel': 'website',
         'status': 'pending',
+        'customer_id': request.customer_id if request.customer_id else None,
         'customer_name': request.customer_name,
         'customer_phone': request.customer_phone,
         'customer_email': request.customer_email,
