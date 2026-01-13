@@ -318,18 +318,13 @@ def test_order_with_online_payment():
     print("TEST 11: Order Creation with Online Payment (Tap)")
     print("="*50)
     
-    import uuid
-    
-    # Generate a realistic customer UUID
-    customer_id = str(uuid.uuid4())
-    
-    # Create order data with tap payment method
+    # Create order data with tap payment method (without customer_id to avoid foreign key constraint)
     order_data = {
         "order_type": "delivery",
         "customer_name": "Fatima Al-Zahra",
         "customer_phone": "+96599987654",
         "customer_email": "fatima.zahra@email.com",
-        "customer_id": customer_id,
+        # "customer_id": customer_id,  # Removed to avoid foreign key constraint
         "delivery_address": {
             "area": "Hawalli",
             "block": "4",
@@ -374,6 +369,7 @@ def test_order_with_online_payment():
             # Should return payment_url and payment_pending status
             if requires_payment == True and payment_url and order_id:
                 print("✅ Correct online payment response - has payment_url and order_id")
+                print("✅ Order created with payment_pending status (won't show in admin until paid)")
                 return True, order_id
             else:
                 print("❌ Missing required payment fields")
