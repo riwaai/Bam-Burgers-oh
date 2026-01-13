@@ -511,15 +511,15 @@ def test_tap_payment_order_creation():
             print(f"Order Number: {order_number}")
             print(f"Order ID: {order_id}")
             
-            # Should return requires_payment: true and payment_url starting with https://goSellJSLib
+            # Should return requires_payment: true and payment_url starting with https://
             if requires_payment == True and payment_url and payment_url.startswith('https://'):
                 print("✅ Correct tap payment response - requires payment and has payment URL")
-                # Order number should be empty since order isn't created yet
-                if not order_number or order_number == "":
-                    print("✅ Order number correctly empty (order not created yet)")
-                    return True, order_id  # Return the charge_ref for potential verification
+                # Order is created with payment_pending status, so order_number is expected
+                if order_number and order_id:
+                    print("✅ Order created with payment_pending status (correct behavior)")
+                    return True, order_id
                 else:
-                    print("❌ Order number should be empty for tap payment before verification")
+                    print("❌ Missing order details")
                     return False, None
             else:
                 print("❌ Missing required payment fields or incorrect values")
