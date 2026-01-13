@@ -661,7 +661,7 @@ def main():
     print("🔥"*25)
     
     # Test 10: Order Creation with Loyalty Points
-    loyalty_order_success, loyalty_order_id, customer_id = test_order_creation_with_loyalty_points()
+    loyalty_order_success, loyalty_order_id = test_order_creation_with_loyalty_points()
     results.append(("Order Creation with Loyalty Points", loyalty_order_success))
     
     # Test 11: Order with Online Payment
