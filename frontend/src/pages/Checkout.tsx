@@ -279,8 +279,6 @@ const Checkout = () => {
     );
   }
 
-  const finalTotal = subtotal - discount + deliveryFee;
-
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
