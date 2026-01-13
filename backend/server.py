@@ -78,6 +78,7 @@ class CreateOrderRequest(BaseModel):
     customer_name: str
     customer_phone: str
     customer_email: Optional[str] = None
+    customer_id: Optional[str] = None
     delivery_address: Optional[DeliveryAddress] = None
     delivery_instructions: Optional[str] = None
     items: List[OrderItem]
@@ -88,6 +89,8 @@ class CreateOrderRequest(BaseModel):
     notes: Optional[str] = None
     coupon_code: Optional[str] = None
     payment_method: Optional[str] = "cash"
+    loyalty_points_used: int = 0
+    loyalty_points_earned: int = 0
 
 class OrderResponse(BaseModel):
     id: str
