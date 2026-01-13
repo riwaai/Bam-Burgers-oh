@@ -273,6 +273,19 @@ const AdminOrders = () => {
       
       toast.success(`Status updated to ${statusConfig[newStatus].label}`);
       
+      // Auto-print receipt when order is accepted
+      if (newStatus === 'accepted') {
+        const orderToPrint = orders.find(o => o.id === orderId);
+        if (orderToPrint) {
+          try {
+            printReceipt(orderToPrint as any);
+            toast.success('Receipt sent to printer');
+          } catch (printErr) {
+            console.error('Print error:', printErr);
+          }
+        }
+      }
+      
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
       if (selectedOrder?.id === orderId) {
         setSelectedOrder(prev => prev ? { ...prev, status: newStatus } : null);
