@@ -102,7 +102,12 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: Test the Bam Burgers backend API to verify Order Creation, Order Status Update, Get Admin Orders, Coupon Validation, and Loyalty Settings endpoints
+user_problem_statement: |
+  Fix critical issues in Bam Burgers application:
+  1. Fix blank checkout page (caused by duplicate finalTotal variable)
+  2. Verify loyalty program integration (points earning/spending)
+  3. Ensure receipt auto-prints when admin clicks "Accept" button
+  4. Verify orders appear in admin panel after successful payment
 
 backend:
   - task: "Order Creation API"
