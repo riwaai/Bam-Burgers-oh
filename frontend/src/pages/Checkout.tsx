@@ -506,6 +506,12 @@ const Checkout = () => {
                           <span>-{formatPrice(discount)}</span>
                         </div>
                       )}
+                      {loyaltyDiscount > 0 && (
+                        <div className={`flex justify-between text-orange-600 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                          <span>{isRTL ? 'خصم النقاط' : 'Points Discount'}</span>
+                          <span>-{formatPrice(loyaltyDiscount)}</span>
+                        </div>
+                      )}
                       {!isPickup && (
                         <div className={`flex justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
                           <span className="text-muted-foreground">{t.checkout.deliveryFee}</span>
@@ -513,6 +519,76 @@ const Checkout = () => {
                         </div>
                       )}
                     </div>
+                    
+                    {/* Loyalty Points Section - Only for logged in customers */}
+                    {customer && loyaltySettings?.enabled && customerPoints > 0 && (
+                      <>
+                        <Separator />
+                        <div className="p-3 bg-orange-50 rounded-lg space-y-3">
+                          <div className={`flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
+                            <span className="text-sm font-medium text-orange-700">
+                              {isRTL ? 'نقاط الولاء' : 'Loyalty Points'}
+                            </span>
+                            <span className="text-sm font-bold text-orange-600">
+                              {customerPoints} {isRTL ? 'نقطة' : 'pts'}
+                            </span>
+                          </div>
+                          
+                          {customerPoints >= minPointsToRedeem ? (
+                            <div className="space-y-2">
+                              <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                <input
+                                  type="checkbox"
+                                  id="usePoints"
+                                  checked={usePoints}
+                                  onChange={(e) => {
+                                    setUsePoints(e.target.checked);
+                                    if (e.target.checked) {
+                                      setPointsToRedeem(customerPoints);
+                                    } else {
+                                      setPointsToRedeem(0);
+                                    }
+                                  }}
+                                  className="rounded border-orange-300 text-orange-600 focus:ring-orange-500"
+                                />
+                                <label htmlFor="usePoints" className="text-sm text-orange-700 cursor-pointer">
+                                  {isRTL ? 'استخدم النقاط للخصم' : 'Use points for discount'}
+                                </label>
+                              </div>
+                              {usePoints && (
+                                <div className="space-y-1">
+                                  <input
+                                    type="range"
+                                    min={0}
+                                    max={customerPoints}
+                                    value={pointsToRedeem}
+                                    onChange={(e) => setPointsToRedeem(parseInt(e.target.value))}
+                                    className="w-full h-2 bg-orange-200 rounded-lg appearance-none cursor-pointer"
+                                  />
+                                  <div className={`flex justify-between text-xs text-orange-600 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                    <span>0 pts</span>
+                                    <span className="font-bold">{pointsToRedeem} pts = {formatPrice(pointsToRedeem * pointValue)} discount</span>
+                                    <span>{customerPoints} pts</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-orange-600">
+                              {isRTL 
+                                ? `تحتاج ${minPointsToRedeem} نقطة على الأقل للاستبدال`
+                                : `You need at least ${minPointsToRedeem} points to redeem`}
+                            </p>
+                          )}
+                          
+                          <div className="text-xs text-orange-500 pt-1 border-t border-orange-200">
+                            {isRTL 
+                              ? `ستكسب ${pointsToEarn} نقطة من هذا الطلب`
+                              : `You'll earn ${pointsToEarn} points from this order`}
+                          </div>
+                        </div>
+                      </>
+                    )}
                     <Separator />
                     <div className={`flex justify-between text-lg font-bold ${isRTL ? 'flex-row-reverse' : ''}`}>
                       <span>{t.checkout.total}</span>
