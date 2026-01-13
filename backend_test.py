@@ -335,7 +335,7 @@ def test_order_with_online_payment():
         },
         "items": [
             {
-                "item_id": "d4444444-4444-4444-4444-444444444444",
+                "item_id": "c2222222-2222-2222-2222-222222222222",  # Use same item_id as working test
                 "item_name_en": "Chicken Shawarma",
                 "item_name_ar": "شاورما دجاج",
                 "quantity": 2,
