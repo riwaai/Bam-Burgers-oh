@@ -259,7 +259,11 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Checkout Page - Fix Blank Screen"
+    - "Loyalty Program - Points Earning and Spending"
+    - "Loyalty Points Backend Integration"
+    - "Receipt Auto-Print on Order Accept"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -271,3 +275,5 @@ agent_communication:
       message: "Fixed the payment flow. Key changes: 1) Fixed FRONTEND_URL in backend .env to use correct preview URL for Tap redirects. 2) Fixed TENANT_ID and BRANCH_ID to use correct UUIDs. 3) Changed Checkout.tsx to NOT clear cart before Tap redirect - cart persists in localStorage. 4) PaymentResult.tsx verifies payment via /api/payment/verify/{ref} and only clears cart on success. Please test the Payment Verification API endpoint to verify it returns correct responses."
     - agent: "testing"
       message: "✅ PAYMENT VERIFICATION FLOW TESTING COMPLETE. All payment-related backend APIs are working correctly: 1) Payment Verification API (GET /api/payment/verify/{charge_ref}) returns proper responses for non-existent refs. 2) Tap Payment Order Creation correctly returns requires_payment: true with valid payment_url and does NOT create order immediately. 3) Cash Payment Order Creation immediately creates orders with proper IDs. 4) Admin Orders API includes payment info when available. Payment flow implementation is solid and ready for production use. Minor issue: No coupons exist in database so coupon validation test fails, but this is expected and not critical."
+    - agent: "main"
+      message: "Fixed critical checkout page blank screen issue caused by duplicate finalTotal variable. Implemented complete loyalty program with points earning/spending UI and backend integration. Receipt auto-print and 80mm formatting already implemented. Ready for backend testing to verify loyalty points integration and order payment flow."
