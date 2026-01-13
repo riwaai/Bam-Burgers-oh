@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { supabase, TENANT_ID } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import OrderReceipt from '@/components/admin/OrderReceipt';
-import html2canvas from 'html2canvas';
+import { printReceipt, downloadReceiptPNG, generateReceiptHTML } from '@/utils/receipt';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL || '';
 
