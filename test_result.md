@@ -204,7 +204,22 @@ backend:
           comment: "✅ Tap Payment Flow working correctly. POST /api/orders with payment_method='tap' returns requires_payment: true, valid payment_url (https://checkout.tap.company), and empty order_number (order not created yet). Cash payments create orders immediately with proper order_id and order_number. Admin orders endpoint includes payment info when available."
 
 frontend:
-  - task: "Checkout - Cart Preservation on Online Payment"
+  - task: "Checkout Page - Fix Blank Screen"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/Checkout.tsx"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: false
+          agent: "user"
+          comment: "User reported: Checkout page is completely blank after loyalty program implementation."
+        - working: "NA"
+          agent: "main"
+          comment: "Fixed duplicate finalTotal variable declaration that was causing the page to crash. Removed line 282 which redeclared finalTotal with wrong calculation. The correct calculation on line 119 already handles loyalty discount."
+  
+  - task: "Loyalty Program - Points Earning and Spending"
     implemented: true
     working: "NA"
     file: "/app/frontend/src/pages/Checkout.tsx"
@@ -214,7 +229,7 @@ frontend:
     status_history:
         - working: "NA"
           agent: "main"
-          comment: "Fixed Checkout.tsx to NOT clear cart before redirecting to Tap payment. Cart is now only cleared after successful payment verification in PaymentResult.tsx."
+          comment: "Implemented full loyalty program in Checkout.tsx: fetches loyalty settings, calculates points to earn/spend, UI for redeeming points with slider, loyalty discount applied to order. Backend server.py handles points update in create_order_in_db function."
 
   - task: "Payment Result Page - Verification Flow"
     implemented: true
