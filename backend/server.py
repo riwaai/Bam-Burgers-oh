@@ -306,6 +306,38 @@ async def create_order_in_db(request: CreateOrderRequest, payment_status: str = 
         await supabase_request('POST', 'payments', data=payment_data)
         logging.info(f"Payment record created for order {order_id}: transaction_id={transaction_id}")
     
+    # Handle loyalty points
+    if request.customer_id:
+        try:
+            # Get current customer loyalty points
+            customers = await supabase_request('GET', 'customers', params={'id': f'eq.{request.customer_id}', 'select': 'loyalty_points'})
+            current_points = customers[0]['loyalty_points'] if customers else 0
+            
+            # Calculate new balance
+            points_spent = request.loyalty_points_used
+            points_earned = request.loyalty_points_earned
+            new_balance = current_points - points_spent + points_earned
+            
+            # Update customer loyalty points
+            await supabase_request('PATCH', 'customers', 
+                data={'loyalty_points': new_balance, 'updated_at': datetime.utcnow().isoformat()},
+                params={'id': f'eq.{request.customer_id}'})
+            
+            # Create loyalty transaction record
+            if points_spent > 0 or points_earned > 0:
+                loyalty_transaction = {
+                    'customer_id': request.customer_id,
+                    'order_id': order_id,
+                    'points_earned': points_earned,
+                    'points_spent': points_spent,
+                    'balance_after': new_balance,
+                    'notes': f'Order #{order_number}',
+                }
+                await supabase_request('POST', 'loyalty_transactions', data=loyalty_transaction)
+                logging.info(f"Loyalty transaction created for customer {request.customer_id}: +{points_earned}/-{points_spent}")
+        except Exception as e:
+            logging.warning(f"Could not update loyalty points: {e}")
+    
     return {
         'id': order_id,
         'order_number': order_number,
