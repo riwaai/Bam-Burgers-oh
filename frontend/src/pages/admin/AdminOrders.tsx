@@ -140,20 +140,53 @@ const AdminOrders = () => {
   useEffect(() => {
     fetchOrders();
     
-    const channel = supabase
+    // Subscribe to orders table changes
+    const ordersChannel = supabase
       .channel('orders-realtime')
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'orders',
         filter: `tenant_id=eq.${TENANT_ID}`
-      }, () => fetchOrders())
+      }, () => {
+        console.log('Order change detected, refreshing...');
+        fetchOrders();
+      })
       .subscribe();
     
+    // Subscribe to order_items table changes
+    const itemsChannel = supabase
+      .channel('order-items-realtime')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'order_items'
+      }, () => {
+        console.log('Order items change detected, refreshing...');
+        fetchOrders();
+      })
+      .subscribe();
+    
+    // Subscribe to payments table changes
+    const paymentsChannel = supabase
+      .channel('payments-realtime')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'payments'
+      }, () => {
+        console.log('Payment change detected, refreshing...');
+        fetchOrders();
+      })
+      .subscribe();
+    
+    // Poll as backup in case realtime fails
     const pollInterval = setInterval(fetchOrders, 15000);
     
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(itemsChannel);
+      supabase.removeChannel(paymentsChannel);
       clearInterval(pollInterval);
       if (buzzerIntervalRef.current) clearInterval(buzzerIntervalRef.current);
     };
