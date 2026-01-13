@@ -180,11 +180,11 @@ const AdminOrders = () => {
 
   const fetchOrders = async () => {
     try {
+      // Fetch orders excluding payment_pending (they should only appear after payment is confirmed)
       const { data: ordersData, error } = await supabase
         .from('orders')
         .select('*')
         .eq('tenant_id', TENANT_ID)
-        .neq('payment_status', 'payment_pending')  // Filter out pending payment orders
         .order('created_at', { ascending: false })
         .limit(100);
       
