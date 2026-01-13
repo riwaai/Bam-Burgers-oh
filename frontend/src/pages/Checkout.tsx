@@ -187,7 +187,8 @@ const Checkout = () => {
         geo_lng: mapPosition?.[1],
       };
 
-      const orderTotal = subtotal - discount + deliveryFee;
+      // Calculate final order total with loyalty discount
+      const orderTotal = subtotal - discount - loyaltyDiscount + (isPickup ? 0 : deliveryFee);
 
       const orderItems = items.map(item => ({
         item_id: item.menu_item_id,
@@ -221,15 +222,19 @@ const Checkout = () => {
           customer_name: `${formData.firstName} ${formData.lastName}`.trim(),
           customer_phone: formData.phone,
           customer_email: formData.email || undefined,
+          customer_id: customer?.id || undefined,
           delivery_address: addressObj,
           delivery_instructions: formData.additionalInfo || undefined,
           items: orderItems,
           subtotal: subtotal,
-          discount_amount: discount,
-          delivery_fee: deliveryFee,
+          discount_amount: discount + loyaltyDiscount, // Include loyalty discount
+          delivery_fee: isPickup ? 0 : deliveryFee,
           total_amount: orderTotal,
           notes: combinedNotes || undefined,
           payment_method: paymentMethod === 'online' ? 'tap' : 'cash',
+          // Loyalty data
+          loyalty_points_used: usePoints ? pointsToRedeem : 0,
+          loyalty_points_earned: pointsToEarn,
         }),
       });
 
