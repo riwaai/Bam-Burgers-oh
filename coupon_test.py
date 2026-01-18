@@ -334,11 +334,14 @@ def test_per_customer_limit():
     print("TEST 7: Per-Customer Limit")
     print("="*60)
     
-    # Test with customer_id parameter
+    # Test with customer_id parameter (use UUID format)
+    import uuid
+    customer_uuid = str(uuid.uuid4())
+    
     params = {
         "code": "PERCENT20",
         "subtotal": 10.0,
-        "customer_id": "test-customer-123"
+        "customer_id": customer_uuid
     }
     
     success, result = test_api_endpoint("POST", "/coupons/validate", params=params, expected_status=200)
