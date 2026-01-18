@@ -29,7 +29,7 @@ const MapSection = lazy(() => import('@/components/CheckoutMap'));
 
 const Checkout = () => {
   const navigate = useNavigate();
-  const { items, subtotal, total, discount, clearCart } = useCart();
+  const { items, subtotal, total, discount, clearCart, appliedCoupon } = useCart();
   const { t, isRTL } = useLanguage();
   const { orderType, deliveryAddress, selectedBranch, setOrderType } = useOrder();
   const { customer } = useCustomerAuth();
