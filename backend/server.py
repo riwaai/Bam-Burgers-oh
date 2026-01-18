@@ -945,15 +945,18 @@ async def create_coupon(coupon: CouponCreate):
             'id': str(uuid.uuid4()),
             'tenant_id': TENANT_ID,
             'code': coupon.code.upper(),
-            # 'description': coupon.description,  # Commented out - column doesn't exist in DB
             'discount_type': coupon.discount_type,
             'discount_value': coupon.discount_value,
-            'min_order_amount': coupon.min_order_amount,
-            'max_discount_amount': coupon.max_discount_amount,
-            'max_uses': coupon.max_uses,
-            'uses_count': 0,
             'status': coupon.status,
         }
+        
+        # Add optional fields only if they have values
+        if coupon.min_order_amount > 0:
+            coupon_data['min_order_amount'] = coupon.min_order_amount
+        if coupon.max_discount_amount is not None:
+            coupon_data['max_discount_amount'] = coupon.max_discount_amount
+        if coupon.max_uses is not None:
+            coupon_data['max_uses'] = coupon.max_uses
         
         result = await supabase_request('POST', 'coupons', data=coupon_data)
         return result[0] if result else coupon_data
