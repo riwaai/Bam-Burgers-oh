@@ -945,7 +945,7 @@ async def create_coupon(coupon: CouponCreate):
             'id': str(uuid.uuid4()),
             'tenant_id': TENANT_ID,
             'code': coupon.code.upper(),
-            'description': coupon.description,
+            # 'description': coupon.description,  # Commented out - column doesn't exist in DB
             'discount_type': coupon.discount_type,
             'discount_value': coupon.discount_value,
             'min_order_amount': coupon.min_order_amount,
