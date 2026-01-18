@@ -805,9 +805,10 @@ async def tap_webhook(request: Request):
 # ==================== COUPONS ====================
 
 @api_router.post("/coupons/validate")
-async def validate_coupon(code: str, subtotal: float):
-    """Validate a coupon code"""
+async def validate_coupon(code: str, subtotal: float, customer_id: Optional[str] = None):
+    """Validate a coupon code with comprehensive checks"""
     try:
+        # Fetch coupon
         coupons = await supabase_request('GET', 'coupons', params={
             'code': f'eq.{code.upper()}',
             'tenant_id': f'eq.{TENANT_ID}',
@@ -816,38 +817,85 @@ async def validate_coupon(code: str, subtotal: float):
         })
         
         if not coupons:
-            raise HTTPException(status_code=404, detail="Coupon not found or expired")
+            raise HTTPException(status_code=404, detail="Coupon not found or inactive")
         
         coupon = coupons[0]
+        coupon_id = coupon['id']
+        now = datetime.utcnow()
         
-        min_order = coupon.get('min_order_amount', 0) or 0
-        if subtotal < min_order:
-            raise HTTPException(status_code=400, detail=f"Minimum order amount is {min_order} KWD")
+        # Check date validity
+        valid_from = coupon.get('valid_from')
+        valid_to = coupon.get('valid_to')
         
-        discount_type = coupon.get('discount_type', 'percentage')
-        discount_value = coupon.get('discount_value', 0)
+        if valid_from:
+            from_date = datetime.fromisoformat(valid_from.replace('Z', '+00:00')) if isinstance(valid_from, str) else valid_from
+            if now < from_date:
+                raise HTTPException(status_code=400, detail="Coupon is not yet valid")
         
-        if discount_type == 'percentage':
-            discount_amount = subtotal * (discount_value / 100)
-            max_discount = coupon.get('max_discount_amount')
-            if max_discount and discount_amount > max_discount:
-                discount_amount = max_discount
+        if valid_to:
+            to_date = datetime.fromisoformat(valid_to.replace('Z', '+00:00')) if isinstance(valid_to, str) else valid_to
+            if now > to_date:
+                raise HTTPException(status_code=400, detail="Coupon has expired")
+        
+        # Check minimum basket amount
+        min_basket = float(coupon.get('min_basket', 0) or 0)
+        if subtotal < min_basket:
+            raise HTTPException(status_code=400, detail=f"Minimum order amount is {min_basket:.3f} KWD")
+        
+        # Check global usage limit
+        usage_limit = coupon.get('usage_limit')
+        if usage_limit is not None and usage_limit > 0:
+            usage_count = await supabase_request('GET', 'coupon_usage', params={
+                'coupon_id': f'eq.{coupon_id}',
+                'select': 'id'
+            })
+            current_usage = len(usage_count) if usage_count else 0
+            if current_usage >= usage_limit:
+                raise HTTPException(status_code=400, detail="Coupon usage limit reached")
+        
+        # Check per-customer usage limit
+        if customer_id:
+            per_customer_limit = coupon.get('per_customer_limit', 1) or 1
+            if per_customer_limit > 0:
+                customer_usage = await supabase_request('GET', 'coupon_usage', params={
+                    'coupon_id': f'eq.{coupon_id}',
+                    'customer_id': f'eq.{customer_id}',
+                    'select': 'id'
+                })
+                customer_usage_count = len(customer_usage) if customer_usage else 0
+                if customer_usage_count >= per_customer_limit:
+                    raise HTTPException(status_code=400, detail=f"You have already used this coupon {per_customer_limit} time(s)")
+        
+        # Calculate discount
+        discount_type = coupon.get('discount_type', 'percent')
+        discount_value = float(coupon.get('discount_value', 0))
+        
+        if discount_type in ['percentage', 'percent']:
+            # Percentage discount
+            discount_amount = subtotal * (discount_value / 100.0)
+            max_discount = coupon.get('max_discount')
+            if max_discount and discount_amount > float(max_discount):
+                discount_amount = float(max_discount)
         else:
-            discount_amount = discount_value
+            # Fixed amount discount
+            discount_amount = min(discount_value, subtotal)  # Can't discount more than subtotal
         
         return {
             "valid": True,
-            "coupon_id": coupon['id'],
+            "coupon_id": coupon_id,
             "code": coupon['code'],
             "discount_type": discount_type,
             "discount_value": discount_value,
             "discount_amount": round(discount_amount, 3),
-            "description": coupon.get('description', '')
+            "name_en": coupon.get('name_en', ''),
+            "name_ar": coupon.get('name_ar', '')
         }
     except HTTPException:
         raise
     except Exception as e:
         logging.error(f"Error validating coupon: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
