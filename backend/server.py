@@ -861,7 +861,7 @@ async def validate_coupon(code: str, subtotal: float, customer_id: Optional[str]
                 raise HTTPException(status_code=400, detail="Coupon has expired")
         
         # Check minimum basket amount
-        min_basket = float(coupon.get('min_basket', 0) or 0)
+        min_basket = float(coupon.get('min_order_amount', 0) or 0)  # Fixed: use min_order_amount
         if subtotal < min_basket:
             raise HTTPException(status_code=400, detail=f"Minimum order amount is {min_basket:.3f} KWD")
         
