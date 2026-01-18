@@ -405,12 +405,16 @@ def test_full_order_flow():
     print("="*60)
     
     # Create order with coupon_code in request body
+    # Use UUID for customer_id to match database requirements
+    import uuid
+    customer_uuid = str(uuid.uuid4())
+    
     order_data = {
         "order_type": "delivery",
         "customer_name": "Khalid Al-Ahmad",
         "customer_phone": "+96599123456",
         "customer_email": "khalid.ahmad@email.com",
-        "customer_id": "test-customer-order-flow",
+        "customer_id": customer_uuid,
         "delivery_address": {
             "area": "Salmiya",
             "block": "10",
