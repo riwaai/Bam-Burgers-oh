@@ -155,11 +155,14 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
   // Apply coupon via backend API
-  const applyCoupon = async (code: string): Promise<boolean> => {
+  const applyCoupon = async (code: string, customerId?: string): Promise<boolean> => {
     try {
-      const response = await fetch(
-        `${BACKEND_URL}/api/coupons/validate?code=${encodeURIComponent(code)}&subtotal=${subtotal}`
-      , { method: 'POST' });
+      let url = `${BACKEND_URL}/api/coupons/validate?code=${encodeURIComponent(code)}&subtotal=${subtotal}`;
+      if (customerId) {
+        url += `&customer_id=${encodeURIComponent(customerId)}`;
+      }
+      
+      const response = await fetch(url, { method: 'POST' });
       
       if (!response.ok) {
         const error = await response.json();
@@ -170,7 +173,16 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       const result = await response.json();
       setAppliedCoupon(result.code);
       setDiscount(result.discount_amount);
-      toast.success(`Coupon applied! ${result.description || `${result.discount_amount.toFixed(3)} KWD off`}`);
+      
+      // Show proper discount description
+      let discountMsg = '';
+      if (result.discount_type === 'percentage' || result.discount_type === 'percent') {
+        discountMsg = `${result.discount_value}% off - ${result.discount_amount.toFixed(3)} KWD saved!`;
+      } else {
+        discountMsg = `${result.discount_amount.toFixed(3)} KWD off`;
+      }
+      
+      toast.success(`Coupon applied! ${discountMsg}`);
       return true;
     } catch (error) {
       toast.error("Invalid coupon code");
