@@ -968,7 +968,7 @@ async def update_coupon(coupon_id: str, coupon: CouponCreate):
     try:
         update_data = {
             'code': coupon.code.upper(),
-            'description': coupon.description,
+            # 'description': coupon.description,  # Commented out - column doesn't exist in DB
             'discount_type': coupon.discount_type,
             'discount_value': coupon.discount_value,
             'min_order_amount': coupon.min_order_amount,
