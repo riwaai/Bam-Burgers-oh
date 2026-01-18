@@ -148,7 +148,7 @@ export const generateReceiptHTML = (order: Order): string => {
     }
     body {
       font-family: 'Courier New', Courier, monospace;
-      font-size: 12px;
+      font-size: 14px;
       width: 80mm;
       max-width: 80mm;
       padding: 5mm;
@@ -167,16 +167,19 @@ export const generateReceiptHTML = (order: Order): string => {
       margin-bottom: 2px;
     }
     .location {
-      font-size: 11px;
+      font-size: 12px;
       color: #333;
+      font-weight: bold;
     }
     .date-time {
-      font-size: 11px;
+      font-size: 12px;
       margin-top: 4px;
+      font-weight: bold;
     }
     .arabic {
       font-family: 'Arial', 'Tahoma', sans-serif;
       direction: rtl;
+      font-weight: bold;
     }
     .bill-info {
       text-align: center;
@@ -192,16 +195,18 @@ export const generateReceiptHTML = (order: Order): string => {
       margin: 4px 0;
     }
     .order-type {
-      font-size: 11px;
+      font-size: 13px;
       text-transform: uppercase;
+      font-weight: bold;
     }
     .dashed {
       border-top: 1px dashed black;
       margin: 8px 0;
     }
     .customer-info {
-      font-size: 11px;
+      font-size: 12px;
       margin: 8px 0;
+      font-weight: bold;
     }
     .customer-info p {
       margin: 4px 0;
@@ -213,34 +218,38 @@ export const generateReceiptHTML = (order: Order): string => {
     }
     th {
       text-align: left;
-      font-size: 10px;
+      font-size: 11px;
       border-bottom: 1px dashed black;
-      padding: 4px 2px;
+      padding: 4px 2px;    
     }
     th.qty, th.rate, th.total {
       text-align: right;
+      font-weight: bold;
     }
     td {
       padding: 4px 2px;
       vertical-align: top;
       font-size: 11px;
+      font-weight: bold;
     }
     td.item-name {
       max-width: 120px;
+      font-weight: bold;
     }
     td.qty, td.rate, td.total {
       text-align: right;
       white-space: nowrap;
     }
     .modifier {
-      font-size: 10px;
+      font-size: 12px;
       color: #e67e22;
       font-weight: bold;
     }
     .item-notes {
-      font-size: 9px;
+      font-size: 12px;
       color: #666;
       font-style: italic;
+      font-weight: bold;
     }
     .totals {
       margin: 8px 0;
@@ -248,8 +257,9 @@ export const generateReceiptHTML = (order: Order): string => {
     .totals-row {
       display: flex;
       justify-content: space-between;
-      font-size: 11px;
+      font-size: 12px;
       margin: 4px 0;
+      font-weight: bold;
     }
     .totals-row.bold {
       font-weight: bold;
@@ -274,6 +284,7 @@ export const generateReceiptHTML = (order: Order): string => {
       direction: rtl;
       font-size: 12px;
       color: #333;
+      font-weight: bold;
     }
     .grand-total-amount {
       font-size: 24px;
@@ -282,15 +293,17 @@ export const generateReceiptHTML = (order: Order): string => {
     }
     .payment-info {
       text-align: center;
-      font-size: 10px;
+      font-size: 11px;
       color: #666;
       margin: 8px 0;
+      font-weight: bold;
     }
     .footer {
       text-align: center;
       margin-top: 10px;
       padding-top: 8px;
       border-top: 1px dashed black;
+      font-weight: bold;
     }
     .thank-you {
       font-size: 11px;
@@ -301,11 +314,13 @@ export const generateReceiptHTML = (order: Order): string => {
       direction: rtl;
       font-size: 11px;
       margin-top: 4px;
+      font-weight: bold;
     }
     .powered-by {
-      font-size: 10px;
+      font-size: 11px;
       color: #999;
       margin-top: 8px;
+      font-weight: bold;
     }
   </style>
 </head>
