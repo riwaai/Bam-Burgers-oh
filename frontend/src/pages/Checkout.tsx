@@ -232,6 +232,7 @@ const Checkout = () => {
           total_amount: orderTotal,
           notes: combinedNotes || undefined,
           payment_method: paymentMethod === 'online' ? 'tap' : 'cash',
+          coupon_code: appliedCoupon || undefined, // Include coupon code
           // Loyalty data
           loyalty_points_used: usePoints ? pointsToRedeem : 0,
           loyalty_points_earned: pointsToEarn,
