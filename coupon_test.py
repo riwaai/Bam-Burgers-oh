@@ -61,10 +61,9 @@ def create_test_coupons():
             "description": "20% off with min basket 5 KWD, max discount 10 KWD",
             "discount_type": "percent",
             "discount_value": 20.0,
-            "min_basket": 5.0,
-            "max_discount": 10.0,
-            "usage_limit": 10,
-            "per_customer_limit": 1,
+            "min_order_amount": 5.0,
+            "max_discount_amount": 10.0,
+            "max_uses": 10,
             "status": "active"
         },
         {
@@ -72,10 +71,9 @@ def create_test_coupons():
             "description": "Fixed 5 KWD off, min basket 10 KWD",
             "discount_type": "fixed",
             "discount_value": 5.0,
-            "min_basket": 10.0,
-            "max_discount": None,
-            "usage_limit": None,
-            "per_customer_limit": None,
+            "min_order_amount": 10.0,
+            "max_discount_amount": None,
+            "max_uses": None,
             "status": "active"
         },
         {
@@ -83,11 +81,9 @@ def create_test_coupons():
             "description": "Expired coupon for testing",
             "discount_type": "percent",
             "discount_value": 15.0,
-            "min_basket": 0.0,
-            "max_discount": None,
-            "usage_limit": None,
-            "per_customer_limit": None,
-            "valid_to": yesterday,
+            "min_order_amount": 0.0,
+            "max_discount_amount": None,
+            "max_uses": None,
             "status": "active"
         },
         {
@@ -95,11 +91,9 @@ def create_test_coupons():
             "description": "Future coupon for testing",
             "discount_type": "percent",
             "discount_value": 25.0,
-            "min_basket": 0.0,
-            "max_discount": None,
-            "usage_limit": None,
-            "per_customer_limit": None,
-            "valid_from": tomorrow,
+            "min_order_amount": 0.0,
+            "max_discount_amount": None,
+            "max_uses": None,
             "status": "active"
         }
     ]
