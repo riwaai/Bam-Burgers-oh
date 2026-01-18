@@ -338,6 +338,29 @@ async def create_order_in_db(request: CreateOrderRequest, payment_status: str = 
         except Exception as e:
             logging.warning(f"Could not update loyalty points: {e}")
     
+    # Track coupon usage
+    if request.coupon_code and request.discount_amount > 0:
+        try:
+            # Get coupon ID
+            coupons = await supabase_request('GET', 'coupons', params={
+                'code': f'eq.{request.coupon_code.upper()}',
+                'tenant_id': f'eq.{TENANT_ID}',
+                'select': 'id'
+            })
+            
+            if coupons:
+                coupon_id = coupons[0]['id']
+                coupon_usage_data = {
+                    'coupon_id': coupon_id,
+                    'customer_id': request.customer_id,
+                    'order_id': order_id,
+                    'discount_applied': request.discount_amount,
+                }
+                await supabase_request('POST', 'coupon_usage', data=coupon_usage_data)
+                logging.info(f"Coupon usage tracked for order {order_id}: {request.coupon_code}")
+        except Exception as e:
+            logging.warning(f"Could not track coupon usage: {e}")
+    
     return {
         'id': order_id,
         'order_number': order_number,
