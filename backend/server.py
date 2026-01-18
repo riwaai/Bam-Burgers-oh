@@ -950,13 +950,13 @@ async def create_coupon(coupon: CouponCreate):
             'status': coupon.status,
         }
         
-        # Add optional fields only if they have values
+        # Map API fields to database fields
         if coupon.min_order_amount > 0:
-            coupon_data['min_order_amount'] = coupon.min_order_amount
+            coupon_data['min_basket'] = coupon.min_order_amount
         if coupon.max_discount_amount is not None:
-            coupon_data['max_discount_amount'] = coupon.max_discount_amount
+            coupon_data['max_discount'] = coupon.max_discount_amount
         if coupon.max_uses is not None:
-            coupon_data['max_uses'] = coupon.max_uses
+            coupon_data['usage_limit'] = coupon.max_uses
         
         result = await supabase_request('POST', 'coupons', data=coupon_data)
         return result[0] if result else coupon_data
