@@ -971,14 +971,18 @@ async def update_coupon(coupon_id: str, coupon: CouponCreate):
     try:
         update_data = {
             'code': coupon.code.upper(),
-            # 'description': coupon.description,  # Commented out - column doesn't exist in DB
             'discount_type': coupon.discount_type,
             'discount_value': coupon.discount_value,
-            'min_order_amount': coupon.min_order_amount,
-            'max_discount_amount': coupon.max_discount_amount,
-            'max_uses': coupon.max_uses,
             'status': coupon.status,
         }
+        
+        # Map API fields to database fields
+        if coupon.min_order_amount > 0:
+            update_data['min_basket'] = coupon.min_order_amount
+        if coupon.max_discount_amount is not None:
+            update_data['max_discount'] = coupon.max_discount_amount
+        if coupon.max_uses is not None:
+            update_data['usage_limit'] = coupon.max_uses
         
         await supabase_request('PATCH', 'coupons', data=update_data, params={'id': f'eq.{coupon_id}'})
         return {"success": True}
