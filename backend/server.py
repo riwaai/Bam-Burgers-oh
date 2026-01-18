@@ -866,7 +866,7 @@ async def validate_coupon(code: str, subtotal: float, customer_id: Optional[str]
             raise HTTPException(status_code=400, detail=f"Minimum order amount is {min_basket:.3f} KWD")
         
         # Check global usage limit
-        usage_limit = coupon.get('max_uses')  # Fixed: use max_uses
+        usage_limit = coupon.get('usage_limit')
         if usage_limit is not None and usage_limit > 0:
             usage_count = await supabase_request('GET', 'coupon_usage', params={
                 'coupon_id': f'eq.{coupon_id}',
