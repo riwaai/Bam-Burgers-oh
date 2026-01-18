@@ -896,7 +896,7 @@ async def validate_coupon(code: str, subtotal: float, customer_id: Optional[str]
         if discount_type in ['percentage', 'percent']:
             # Percentage discount
             discount_amount = subtotal * (discount_value / 100.0)
-            max_discount = coupon.get('max_discount')
+            max_discount = coupon.get('max_discount_amount')  # Fixed: use max_discount_amount
             if max_discount and discount_amount > float(max_discount):
                 discount_amount = float(max_discount)
         else:
