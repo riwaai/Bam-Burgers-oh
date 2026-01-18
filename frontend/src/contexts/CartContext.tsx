@@ -40,7 +40,7 @@ interface CartContextType {
   total: number;
   itemCount: number;
   appliedCoupon: string | null;
-  applyCoupon: (code: string) => Promise<boolean>;
+  applyCoupon: (code: string, customerId?: string) => Promise<boolean>;
   removeCoupon: () => void;
   discount: number;
   deliveryFee: number;
