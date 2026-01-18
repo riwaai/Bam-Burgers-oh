@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useCart } from "@/contexts/CartContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useOrder } from "@/contexts/OrderContext";
+import { useCustomerAuth } from "@/contexts/CustomerAuthContext";
 import { formatPrice } from "@/data/menuItems";
 
 const Cart = () => {
@@ -29,6 +30,7 @@ const Cart = () => {
   } = useCart();
   const { t, isRTL } = useLanguage();
   const { orderType } = useOrder();
+  const { customer } = useCustomerAuth();
   const [couponCode, setCouponCode] = useState("");
   const [isApplying, setIsApplying] = useState(false);
 
@@ -40,7 +42,7 @@ const Cart = () => {
   const handleApplyCoupon = async () => {
     if (couponCode.trim()) {
       setIsApplying(true);
-      await applyCoupon(couponCode.trim());
+      await applyCoupon(couponCode.trim(), customer?.id);
       setCouponCode("");
       setIsApplying(false);
     }
