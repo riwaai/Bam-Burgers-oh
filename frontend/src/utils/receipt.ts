@@ -11,10 +11,13 @@ const RESTAURANT_LOCATION = 'Salwa, Kuwait';
 const POWERED_BY = 'RIWA POS';
 
 /**
- * Format date in Kuwait time
+ * Format date in Kuwait time (with 6 hour offset)
  */
 const formatReceiptDate = (dateStr: string) => {
   const date = new Date(dateStr);
+  // Add 6 hours (6 * 60 * 60 * 1000 milliseconds)
+  date.setTime(date.getTime() + (6 * 60 * 60 * 1000));
+  
   return date.toLocaleDateString('en-GB', {
     timeZone: 'Asia/Kuwait',
     day: '2-digit',
@@ -25,6 +28,9 @@ const formatReceiptDate = (dateStr: string) => {
 
 const formatReceiptTime = (dateStr: string) => {
   const date = new Date(dateStr);
+  // Add 6 hours (6 * 60 * 60 * 1000 milliseconds)
+  date.setTime(date.getTime() + (6 * 60 * 60 * 1000));
+  
   return date.toLocaleTimeString('en-US', {
     timeZone: 'Asia/Kuwait',
     hour: '2-digit',

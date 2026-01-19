@@ -8,7 +8,7 @@ const LOGO_URL = "https://customer-assets.emergentagent.com/job_bam-delivery/art
 
 // Restaurant Address
 const RESTAURANT_ADDRESS = "Kitchen Park Salwa - 834C+HH Rumaithiya, Kuwait";
-const RESTAURANT_ADDRESS_AR = "كيتشن بارك سلوى - 834C+HH الرميثية، الكويت";
+const RESTAURANT_ADDRESS_AR = "كيتشن بارك سلوى - C834C+HH - الرميثية، الكويت";
 
 const Footer = () => {
   const { t, isRTL } = useLanguage();

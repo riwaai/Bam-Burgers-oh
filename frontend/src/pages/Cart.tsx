@@ -36,7 +36,7 @@ const Cart = () => {
 
   // Set delivery fee based on order type
   React.useEffect(() => {
-    setDeliveryFee(orderType === 'delivery' ? 0.000 : 0);
+    setDeliveryFee(orderType === 'delivery' ? 0.500 : 0.5);
   }, [orderType, setDeliveryFee]);
 
   const handleApplyCoupon = async () => {

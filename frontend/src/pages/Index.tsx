@@ -180,7 +180,7 @@ const Index = () => {
                 <p className="text-muted-foreground">
                   {isRTL
                     ? 'تشتهي طعاماً في الليل؟ نحن مفتوحون حتى الساعة 1 صباحاً يومياً'
-                    : "Craving food at night? We're open until 1 AM daily"
+                    : "Craving food at night? We're open until 12:30 AM daily"
                   }
                 </p>
               </CardContent>
