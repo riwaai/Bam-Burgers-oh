@@ -257,6 +257,12 @@ const Cart = () => {
                           <span>-{formatPrice(discount)} {isRTL ? 'د.ك' : 'KWD'}</span>
                         </div>
                       )}
+                      {loyaltyDiscount > 0 && (
+                        <div className={`flex justify-between text-sm text-green-600 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                          <span>{isRTL ? 'خصم نقاط الولاء' : 'Loyalty Points Discount'}</span>
+                          <span>-{formatPrice(loyaltyDiscount)} {isRTL ? 'د.ك' : 'KWD'}</span>
+                        </div>
+                      )}
                       <div className={`flex justify-between text-sm ${isRTL ? 'flex-row-reverse' : ''}`}>
                         <span>{t.cart.deliveryFee}</span>
                         <span>
