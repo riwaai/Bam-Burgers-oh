@@ -234,12 +234,10 @@ const Cart = () => {
                       <>
                         <Separator />
                         <LoyaltyRedemption
-                          customerId={customer.id}
                           subtotal={subtotal}
                           onApplyPoints={handleApplyLoyaltyPoints}
                           onRemovePoints={handleRemoveLoyaltyPoints}
-                          appliedPoints={loyaltyPointsUsed}
-                          appliedDiscount={loyaltyDiscount}
+                          isRTL={isRTL}
                         />
                       </>
                     )}
