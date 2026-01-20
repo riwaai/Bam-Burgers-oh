@@ -40,6 +40,8 @@ import AdminZones from "./pages/admin/AdminZones";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminModifiers from "./pages/admin/AdminModifiers";
 import AdminCustomers from "./pages/admin/AdminCustomers";
+import AdminOperatingHours from "./pages/admin/AdminOperatingHours";
+import AdminCouponUsage from "./pages/admin/AdminCouponUsage";
 
 // Payment Result Page
 const PaymentResult = React.lazy(() => import("./pages/PaymentResult"));
