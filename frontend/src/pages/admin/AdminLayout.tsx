@@ -13,6 +13,8 @@ import {
   X,
   Layers,
   Users,
+  Clock,
+  BarChart3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
@@ -25,9 +27,11 @@ const navItems = [
   { path: '/admin/menu', icon: UtensilsCrossed, label: 'Menu' },
   { path: '/admin/modifiers', icon: Layers, label: 'Modifiers' },
   { path: '/admin/coupons', icon: Tag, label: 'Coupons' },
+  { path: '/admin/coupon-usage', icon: BarChart3, label: 'Coupon Usage' },
   { path: '/admin/loyalty', icon: Gift, label: 'Loyalty' },
   { path: '/admin/customers', icon: Users, label: 'Customers' },
   { path: '/admin/zones', icon: MapPin, label: 'Delivery Zones' },
+  { path: '/admin/operating-hours', icon: Clock, label: 'Operating Hours' },
   { path: '/admin/settings', icon: Settings, label: 'Settings' },
 ];
 
