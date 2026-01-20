@@ -201,15 +201,6 @@ const CustomerLogin = () => {
                   <span className="ml-2 text-xs bg-muted px-2 py-0.5 rounded">{t.auth.phoneOtpDesc}</span>
                 </Button>
               </div>
-
-              {/* Guest Checkout */}
-              <div className="mt-4 text-center">
-                <Link to="/checkout">
-                  <Button variant="ghost" className="text-muted-foreground">
-                    {t.auth.guestCheckout}
-                  </Button>
-                </Link>
-              </div>
             </CardContent>
           </Card>
         </div>
