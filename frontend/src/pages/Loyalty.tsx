@@ -250,32 +250,6 @@ const Loyalty = () => {
               )}
             </CardContent>
           </Card>
-
-          {/* Example Redemptions */}
-          <div className="max-w-2xl mx-auto">
-            <h2 className={`text-2xl font-bold mb-8 ${isRTL ? 'text-right' : 'text-center'}`}>
-              {isRTL ? 'أمثلة على الاستبدال' : 'Example Redemptions'}
-            </h2>
-            <div className="space-y-4">
-              {[0.5, 1, 2, 5].map((kwdValue) => (
-                <Card key={kwdValue}>
-                  <CardContent className={`p-4 flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
-                    <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                      <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                        <Gift className="h-6 w-6 text-primary" />
-                      </div>
-                      <span className="font-medium">
-                        {isRTL ? `خصم ${kwdValue.toFixed(3)} د.ك` : `${kwdValue.toFixed(3)} KWD Discount`}
-                      </span>
-                    </div>
-                    <Badge variant="outline" className="text-primary border-primary">
-                      {getPointsForValue(kwdValue)} {isRTL ? 'نقطة' : 'pts'}
-                    </Badge>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
         </div>
       </main>
 
