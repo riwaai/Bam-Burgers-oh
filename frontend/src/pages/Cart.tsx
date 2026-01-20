@@ -38,6 +38,34 @@ const Cart = () => {
   const [isApplying, setIsApplying] = useState(false);
   const [loyaltyDiscount, setLoyaltyDiscount] = useState(0);
   const [loyaltyPointsUsed, setLoyaltyPointsUsed] = useState(0);
+  const [operatingHours, setOperatingHours] = useState<any>(null);
+  const [restaurantStatus, setRestaurantStatus] = useState({ isOpen: true, message: '', currentTime: '' });
+
+  // Fetch operating hours
+  useEffect(() => {
+    const fetchOperatingHours = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('branches')
+          .select('operating_hours')
+          .eq('id', BRANCH_ID)
+          .single();
+        
+        if (data?.operating_hours) {
+          setOperatingHours(data.operating_hours);
+          const status = isRestaurantOpen(data.operating_hours);
+          setRestaurantStatus(status);
+        }
+      } catch (err) {
+        console.error('Error fetching operating hours:', err);
+      }
+    };
+    
+    fetchOperatingHours();
+    // Check every minute
+    const interval = setInterval(fetchOperatingHours, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Set delivery fee based on order type
   React.useEffect(() => {
