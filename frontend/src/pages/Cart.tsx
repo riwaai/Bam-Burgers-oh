@@ -278,7 +278,7 @@ const Cart = () => {
 
                     <div className={`flex justify-between font-semibold text-lg ${isRTL ? 'flex-row-reverse' : ''}`}>
                       <span>{t.cart.total}</span>
-                      <span className="text-primary">{formatPrice(total)} {isRTL ? 'د.ك' : 'KWD'}</span>
+                      <span className="text-primary">{formatPrice(finalTotal)} {isRTL ? 'د.ك' : 'KWD'}</span>
                     </div>
                     
                     {/* Minimum order warning */}
