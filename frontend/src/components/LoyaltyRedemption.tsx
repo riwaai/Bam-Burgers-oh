@@ -27,7 +27,7 @@ const LoyaltyRedemption: React.FC<LoyaltyRedemptionProps> = ({
   onRemovePoints,
   isRTL
 }) => {
-  const { customer, isAuthenticated } = useCustomerAuth();
+  const { customer, isAuthenticated, refreshCustomer } = useCustomerAuth();
   const [settings, setSettings] = useState<LoyaltySettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [usePoints, setUsePoints] = useState(false);
@@ -35,7 +35,11 @@ const LoyaltyRedemption: React.FC<LoyaltyRedemptionProps> = ({
 
   useEffect(() => {
     fetchLoyaltySettings();
-  }, []);
+    if (isAuthenticated && customer) {
+      // Refresh customer data to get latest points
+      refreshCustomer();
+    }
+  }, [isAuthenticated]);
 
   const fetchLoyaltySettings = async () => {
     try {
