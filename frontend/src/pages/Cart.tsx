@@ -228,6 +228,22 @@ const Cart = () => {
                         </div>
                       )}
                     </div>
+                    
+                    {/* Loyalty Points Redemption */}
+                    {customer && (
+                      <>
+                        <Separator />
+                        <LoyaltyRedemption
+                          customerId={customer.id}
+                          subtotal={subtotal}
+                          onApplyPoints={handleApplyLoyaltyPoints}
+                          onRemovePoints={handleRemoveLoyaltyPoints}
+                          appliedPoints={loyaltyPointsUsed}
+                          appliedDiscount={loyaltyDiscount}
+                        />
+                      </>
+                    )}
+                    
                     <Separator />
 
                     <div className="space-y-3">
