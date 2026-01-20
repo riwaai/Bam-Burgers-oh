@@ -13,6 +13,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useOrder } from "@/contexts/OrderContext";
 import { useCustomerAuth } from "@/contexts/CustomerAuthContext";
 import { formatPrice } from "@/data/menuItems";
+import LoyaltyRedemption from "@/components/LoyaltyRedemption";
 
 const Cart = () => {
   const { 
@@ -33,10 +34,12 @@ const Cart = () => {
   const { customer } = useCustomerAuth();
   const [couponCode, setCouponCode] = useState("");
   const [isApplying, setIsApplying] = useState(false);
+  const [loyaltyDiscount, setLoyaltyDiscount] = useState(0);
+  const [loyaltyPointsUsed, setLoyaltyPointsUsed] = useState(0);
 
   // Set delivery fee based on order type
   React.useEffect(() => {
-    setDeliveryFee(orderType === 'delivery' ? 0.500 : 0.5);
+    setDeliveryFee(orderType === 'delivery' ? 0.5 : 0);
   }, [orderType, setDeliveryFee]);
 
   const handleApplyCoupon = async () => {
@@ -47,6 +50,18 @@ const Cart = () => {
       setIsApplying(false);
     }
   };
+  
+  const handleApplyLoyaltyPoints = (points: number, discount: number) => {
+    setLoyaltyPointsUsed(points);
+    setLoyaltyDiscount(discount);
+  };
+  
+  const handleRemoveLoyaltyPoints = () => {
+    setLoyaltyPointsUsed(0);
+    setLoyaltyDiscount(0);
+  };
+  
+  const finalTotal = subtotal - discount - loyaltyDiscount + deliveryFee;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
