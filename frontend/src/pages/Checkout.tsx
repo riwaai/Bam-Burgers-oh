@@ -156,6 +156,13 @@ const Checkout = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Check minimum order amount (3 KWD)
+    const MINIMUM_ORDER = 3.000;
+    if (subtotal < MINIMUM_ORDER) {
+      toast.error(isRTL ? `الحد الأدنى للطلب هو ${MINIMUM_ORDER.toFixed(3)} د.ك` : `Minimum order amount is ${MINIMUM_ORDER.toFixed(3)} KWD`);
+      return;
+    }
+    
     if (!formData.firstName || !formData.phone) {
       toast.error(isRTL ? 'يرجى ملء جميع الحقول المطلوبة' : 'Please fill all required fields');
       return;
