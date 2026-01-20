@@ -294,7 +294,7 @@ export const en = {
     tagline: "Fresh. Fast. Flavorful.",
     phone: "+965 9474 5424",
     email: "hello@eatbam.me",
-    hoursWeekday: "Daily: 11:00 AM - 1:00 AM",
+    hoursWeekday: "Daily: 1:00 PM - 12:30 AM",
   },
 };
 

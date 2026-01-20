@@ -296,6 +296,6 @@ export const ar: Translations = {
     tagline: "طازج. سريع. مميز.",
     phone: "+965 9474 5424",
     email: "hello@eatbam.me",
-    hoursWeekday: "يومياً: 11:00 صباحاً - 1:00 صباحاً",
+    hoursWeekday: "يومياً: 1:00 مساءً - 12:30 صباحاً",
   },
 };

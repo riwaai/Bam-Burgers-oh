@@ -289,7 +289,7 @@ CREATE TRIGGER on_auth_user_created
 -- Insert default settings
 INSERT INTO public.settings (key, value) VALUES
 ('restaurant', '{"name": "Bam Burgers", "phone": "+965 1234 5678", "email": "hello@bamburgers.com", "address": "Kuwait City, Kuwait", "currency": "KWD"}'),
-('delivery', '{"fee": 1.000, "minOrder": 3.000, "freeDeliveryThreshold": 10.000, "radius": 15}'),
+('delivery', '{"fee": 0.500, "minOrder": 3.000, "freeDeliveryThreshold": 1000.000, "radius": 15}'),
 ('payment', '{"knet": {"enabled": false, "merchantId": ""}, "myfatoorah": {"enabled": false, "apiKey": ""}, "tap": {"enabled": false, "apiKey": ""}, "cashOnDelivery": true}'),
 ('notifications', '{"newOrderAlerts": true, "lowStockAlerts": true, "dailySummary": false}'),
 ('website', '{"onlineOrdering": true, "loyaltyProgram": true, "maintenanceMode": false}');
@@ -313,5 +313,5 @@ INSERT INTO public.menu_items (name, description, price, category, popular, imag
 
 -- Insert sample coupons
 INSERT INTO public.coupons (code, discount_type, discount_value, min_order_amount, active) VALUES
-('WELCOME10', 'percentage', 10, 5.000, true),
-('FREESHIP', 'fixed', 1.000, 3.000, true);
+('WELCOME10', 'percentage', 10, 5.000, false),
+('FREESHIP', 'fixed', 1.000, 3.000, false);

@@ -179,7 +179,7 @@ const Index = () => {
                 </h3>
                 <p className="text-muted-foreground">
                   {isRTL
-                    ? 'تشتهي طعاماً في الليل؟ نحن مفتوحون حتى الساعة 1 صباحاً يومياً'
+                    ? 'تشتهي طعاماً في الليل؟ نحن مفتوحون حتى الساعة 12:30 مساءً يومياً'
                     : "Craving food at night? We're open until 12:30 AM daily"
                   }
                 </p>

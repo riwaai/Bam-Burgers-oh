@@ -50,7 +50,7 @@ const Navbar = () => {
             </a>
             <span className="flex items-center gap-1 text-muted-foreground">
               <Clock className="h-3 w-3" />
-              <span className="hidden sm:inline">{isRTL ? 'يومياً 11ص - 1ص' : '11AM - 1AM'}</span>
+              <span className="hidden sm:inline">{isRTL ? 'يمساءً 1ص - 12:30ص' : '1PM - 12:30AM'}</span>
             </span>
           </div>
           

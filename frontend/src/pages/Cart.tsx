@@ -213,7 +213,6 @@ const Cart = () => {
                         </div>
                       )}
                     </div>
-
                     <Separator />
 
                     <div className="space-y-3">
