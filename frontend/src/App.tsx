@@ -88,9 +88,11 @@ const App = () => (
                       <Route path="menu" element={<AdminMenu />} />
                       <Route path="modifiers" element={<AdminModifiers />} />
                       <Route path="coupons" element={<AdminCoupons />} />
+                      <Route path="coupon-usage" element={<AdminCouponUsage />} />
                       <Route path="loyalty" element={<AdminLoyalty />} />
                       <Route path="customers" element={<AdminCustomers />} />
                       <Route path="zones" element={<AdminZones />} />
+                      <Route path="operating-hours" element={<AdminOperatingHours />} />
                       <Route path="settings" element={<AdminSettings />} />
                     </Route>
                     
