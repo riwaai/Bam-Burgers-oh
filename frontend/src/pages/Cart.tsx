@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft, Tag, ArrowRight } from "lucide-react";
+import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft, Tag, ArrowRight, Clock } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,8 @@ import { useOrder } from "@/contexts/OrderContext";
 import { useCustomerAuth } from "@/contexts/CustomerAuthContext";
 import { formatPrice } from "@/data/menuItems";
 import LoyaltyRedemption from "@/components/LoyaltyRedemption";
+import { supabase, BRANCH_ID } from "@/integrations/supabase/client";
+import { isRestaurantOpen } from "@/utils/operatingHours";
 
 const Cart = () => {
   const { 
