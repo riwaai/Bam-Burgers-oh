@@ -243,10 +243,21 @@ const Cart = () => {
                       <span>{t.cart.total}</span>
                       <span className="text-primary">{formatPrice(total)} {isRTL ? 'د.ك' : 'KWD'}</span>
                     </div>
+                    
+                    {/* Minimum order warning */}
+                    {subtotal < 3.000 && (
+                      <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-700 text-center">
+                        {isRTL ? `الحد الأدنى للطلب: 3.000 د.ك (متبقي ${(3.000 - subtotal).toFixed(3)} د.ك)` : `Minimum order: 3.000 KWD (add ${(3.000 - subtotal).toFixed(3)} KWD more)`}
+                      </div>
+                    )}
                   </CardContent>
                   <CardFooter>
                     <Link to="/checkout" className="w-full">
-                      <Button className="w-full" size="lg">
+                      <Button 
+                        className="w-full" 
+                        size="lg"
+                        disabled={subtotal < 3.000}
+                      >
                         {t.cart.checkout}
                         {isRTL ? (
                           <ArrowLeft className="h-5 w-5 mr-2" />
