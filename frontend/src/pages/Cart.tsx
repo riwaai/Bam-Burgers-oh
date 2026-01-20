@@ -315,13 +315,29 @@ const Cart = () => {
                         {isRTL ? `الحد الأدنى للطلب: 3.000 د.ك (متبقي ${(3.000 - subtotal).toFixed(3)} د.ك)` : `Minimum order: 3.000 KWD (add ${(3.000 - subtotal).toFixed(3)} KWD more)`}
                       </div>
                     )}
+                    
+                    {/* Restaurant closed warning */}
+                    {!restaurantStatus.isOpen && (
+                      <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <div className="flex items-center gap-2 text-red-700 mb-2">
+                          <Clock className="h-5 w-5" />
+                          <span className="font-semibold">
+                            {isRTL ? 'نحن مغلقون حالياً' : 'We are currently closed'}
+                          </span>
+                        </div>
+                        <p className="text-sm text-red-600">{restaurantStatus.message}</p>
+                        <p className="text-xs text-red-500 mt-1">
+                          {isRTL ? `الوقت الحالي: ${restaurantStatus.currentTime}` : `Current time: ${restaurantStatus.currentTime}`}
+                        </p>
+                      </div>
+                    )}
                   </CardContent>
                   <CardFooter>
                     <Link to="/checkout" className="w-full">
                       <Button 
                         className="w-full" 
                         size="lg"
-                        disabled={subtotal < 3.000}
+                        disabled={subtotal < 3.000 || !restaurantStatus.isOpen}
                       >
                         {t.cart.checkout}
                         {isRTL ? (
