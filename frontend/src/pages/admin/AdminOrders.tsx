@@ -8,6 +8,7 @@ import { supabase, TENANT_ID } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import OrderReceipt from '@/components/admin/OrderReceipt';
 import { printReceipt, downloadReceiptPNG, generateReceiptHTML } from '@/utils/receipt';
+import { formatKuwaitTime } from '@/utils/operatingHours';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL || '';
 
