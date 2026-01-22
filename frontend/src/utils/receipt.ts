@@ -2,7 +2,10 @@
  * Receipt Utility for Bam Burgers
  * Supports 80mm thermal printers
  * Works with USB, Ethernet, and Cloud printing via browser print dialog
+ * All times displayed in Kuwait Time (UTC+3)
  */
+
+import { formatKuwaitTime, toKuwaitTime } from './operatingHours';
 
 // Restaurant Info
 const RESTAURANT_NAME = 'Bam Burgers';
@@ -11,32 +14,19 @@ const RESTAURANT_LOCATION = 'Salwa, Kuwait';
 const POWERED_BY = 'RIWA POS';
 
 /**
- * Format date in Kuwait time (with 3 hour offset)
+ * Format date in Kuwait time
  */
 const formatReceiptDate = (dateStr: string) => {
-  const date = new Date(dateStr);
-  // Add 6 hours (6 * 60 * 60 * 1000 milliseconds)
-  date.setTime(date.getTime() + (6 * 60 * 60 * 1000));
-  
-  return date.toLocaleDateString('en-GB', {
-    timeZone: 'Asia/Kuwait',
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
+  const kuwaitDate = toKuwaitTime(new Date(dateStr));
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const day = kuwaitDate.getUTCDate();
+  const month = months[kuwaitDate.getUTCMonth()];
+  const year = kuwaitDate.getUTCFullYear();
+  return `${day} ${month} ${year}`;
 };
 
 const formatReceiptTime = (dateStr: string) => {
-  const date = new Date(dateStr);
-  // Add 6 hours (6 * 60 * 60 * 1000 milliseconds)
-  date.setTime(date.getTime() + (6 * 60 * 60 * 1000));
-  
-  return date.toLocaleTimeString('en-US', {
-    timeZone: 'Asia/Kuwait',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  }).toLowerCase();
+  return formatKuwaitTime(new Date(dateStr), false);
 };
 
 interface OrderItem {
