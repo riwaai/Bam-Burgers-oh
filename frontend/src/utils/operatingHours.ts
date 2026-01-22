@@ -1,6 +1,7 @@
 /**
- * Operating Hours Utility
- * Handles Kuwait timezone (UTC+3) and validates if restaurant is open
+ * Operating Hours & Kuwait Time Utility
+ * All times are Kuwait Time (UTC+3, no DST)
+ * Current Kuwait Time: Based on server UTC + 3 hours
  */
 
 interface DaySchedule {
@@ -24,14 +25,70 @@ const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 
 /**
  * Get current Kuwait time
  * Kuwait is UTC+3 with no DST
+ * ALWAYS returns Kuwait time regardless of user's device timezone
  */
 export const getKuwaitTime = (): Date => {
+  // Get current UTC time
   const now = new Date();
-  // Get UTC time
-  const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const utcTime = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+    now.getUTCHours(),
+    now.getUTCMinutes(),
+    now.getUTCSeconds()
+  );
+  
   // Add Kuwait offset (UTC+3 = 180 minutes)
   const kuwaitTime = new Date(utcTime + (180 * 60000));
   return kuwaitTime;
+};
+
+/**
+ * Convert any date to Kuwait time
+ */
+export const toKuwaitTime = (date: Date | string): Date => {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const utcTime = Date.UTC(
+    d.getUTCFullYear(),
+    d.getUTCMonth(),
+    d.getUTCDate(),
+    d.getUTCHours(),
+    d.getUTCMinutes(),
+    d.getUTCSeconds()
+  );
+  return new Date(utcTime + (180 * 60000));
+};
+
+/**
+ * Format Kuwait time for display
+ * Example: "11:48 PM" or "Jan 14, 2025 11:48 PM"
+ */
+export const formatKuwaitTime = (date: Date | string, includeDate: boolean = false): string => {
+  const kuwaitDate = typeof date === 'string' ? toKuwaitTime(new Date(date)) : toKuwaitTime(date);
+  
+  const hours = kuwaitDate.getUTCHours();
+  const minutes = kuwaitDate.getUTCMinutes();
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const displayHours = hours % 12 || 12;
+  const timeStr = `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+  
+  if (includeDate) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[kuwaitDate.getUTCMonth()];
+    const day = kuwaitDate.getUTCDate();
+    const year = kuwaitDate.getUTCFullYear();
+    return `${month} ${day}, ${year} ${timeStr}`;
+  }
+  
+  return timeStr;
+};
+
+/**
+ * Get Kuwait time as ISO string for database storage
+ */
+export const getKuwaitTimeISO = (): string => {
+  return getKuwaitTime().toISOString();
 };
 
 /**
@@ -40,14 +97,14 @@ export const getKuwaitTime = (): Date => {
 export const isRestaurantOpen = (operatingHours: OperatingHours | null): { isOpen: boolean; message: string; currentTime: string } => {
   if (!operatingHours) {
     return {
-      isOpen: true, // Default to open if no hours set
+      isOpen: true,
       message: '',
       currentTime: '',
     };
   }
 
   const kuwaitTime = getKuwaitTime();
-  const dayIndex = kuwaitTime.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  const dayIndex = kuwaitTime.getUTCDay(); // 0 = Sunday, 1 = Monday, etc.
   const currentDay = DAYS[dayIndex];
   const dayHours = operatingHours[currentDay as keyof OperatingHours];
 
@@ -55,11 +112,11 @@ export const isRestaurantOpen = (operatingHours: OperatingHours | null): { isOpe
     return {
       isOpen: false,
       message: 'We are closed today',
-      currentTime: formatTime(kuwaitTime),
+      currentTime: formatKuwaitTime(kuwaitTime),
     };
   }
 
-  const currentTimeStr = `${kuwaitTime.getHours().toString().padStart(2, '0')}:${kuwaitTime.getMinutes().toString().padStart(2, '0')}`;
+  const currentTimeStr = `${kuwaitTime.getUTCHours().toString().padStart(2, '0')}:${kuwaitTime.getUTCMinutes().toString().padStart(2, '0')}`;
   const openTime = dayHours.open;
   const closeTime = dayHours.close;
 
@@ -67,8 +124,6 @@ export const isRestaurantOpen = (operatingHours: OperatingHours | null): { isOpe
   const isOvernight = closeTime < openTime;
 
   if (isOvernight) {
-    // Restaurant closes after midnight
-    // Check if current time is after opening OR before closing
     const isAfterOpen = currentTimeStr >= openTime;
     const isBeforeClose = currentTimeStr < closeTime;
     
@@ -76,16 +131,15 @@ export const isRestaurantOpen = (operatingHours: OperatingHours | null): { isOpe
       return {
         isOpen: true,
         message: '',
-        currentTime: formatTime(kuwaitTime),
+        currentTime: formatKuwaitTime(kuwaitTime),
       };
     }
   } else {
-    // Normal hours within same day
     if (currentTimeStr >= openTime && currentTimeStr < closeTime) {
       return {
         isOpen: true,
         message: '',
-        currentTime: formatTime(kuwaitTime),
+        currentTime: formatKuwaitTime(kuwaitTime),
       };
     }
   }
@@ -93,7 +147,7 @@ export const isRestaurantOpen = (operatingHours: OperatingHours | null): { isOpe
   return {
     isOpen: false,
     message: `We are currently closed. Open ${formatTime12Hour(openTime)} - ${formatTime12Hour(closeTime)}`,
-    currentTime: formatTime(kuwaitTime),
+    currentTime: formatKuwaitTime(kuwaitTime),
   };
 };
 
@@ -111,11 +165,8 @@ export const formatTime12Hour = (time: string): string => {
  * Format Date to readable time string
  */
 export const formatTime = (date: Date): string => {
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  const period = hours >= 12 ? 'PM' : 'AM';
-  const displayHours = hours % 12 || 12;
-  return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+  const kuwaitDate = toKuwaitTime(date);
+  return formatKuwaitTime(kuwaitDate);
 };
 
 /**
@@ -126,7 +177,6 @@ export const getOperatingHoursDisplay = (operatingHours: OperatingHours | null):
     return '1:00 PM - 12:30 AM';
   }
 
-  // Check if all days have same hours
   const firstDay = operatingHours.sunday;
   const allSame = DAYS.every(day => {
     const dayHours = operatingHours[day as keyof OperatingHours];
@@ -139,5 +189,5 @@ export const getOperatingHoursDisplay = (operatingHours: OperatingHours | null):
     return `${formatTime12Hour(firstDay.open)} - ${formatTime12Hour(firstDay.close)}`;
   }
 
-  return 'See hours'; // If different hours per day
+  return 'See hours';
 };

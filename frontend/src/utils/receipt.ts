@@ -11,7 +11,7 @@ const RESTAURANT_LOCATION = 'Salwa, Kuwait';
 const POWERED_BY = 'RIWA POS';
 
 /**
- * Format date in Kuwait time (with 6 hour offset)
+ * Format date in Kuwait time (with 3 hour offset)
  */
 const formatReceiptDate = (dateStr: string) => {
   const date = new Date(dateStr);
