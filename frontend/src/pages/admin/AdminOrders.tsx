@@ -363,14 +363,7 @@ const AdminOrders = () => {
   };
 
   const formatDate = (d: string) => {
-    const date = new Date(d);
-    return date.toLocaleString('en-GB', {
-      timeZone: 'Asia/Kuwait',
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatKuwaitTime(new Date(d), true);
   };
 
   const openReceiptPreview = () => {
