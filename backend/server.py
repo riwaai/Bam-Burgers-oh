@@ -7,12 +7,23 @@ from pathlib import Path
 from pydantic import BaseModel
 from typing import List, Optional
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 import httpx
 import json
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+
+# Kuwait timezone helper
+def get_kuwait_time():
+    """Get current time in Kuwait (UTC+3)"""
+    utc_now = datetime.utcnow()
+    kuwait_time = utc_now + timedelta(hours=3)
+    return kuwait_time
+
+def get_kuwait_time_iso():
+    """Get Kuwait time as ISO string"""
+    return get_kuwait_time().isoformat()
 
 # Supabase configuration
 SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://sqhjsctsxlnivcbeclrn.supabase.co')
