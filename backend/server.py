@@ -17,7 +17,7 @@ load_dotenv(ROOT_DIR / '.env')
 # Kuwait timezone helper
 def get_kuwait_time():
     """Get current time in Kuwait (UTC+3)"""
-    utc_now = get_kuwait_time()
+    utc_now = datetime.utcnow()
     kuwait_time = utc_now + timedelta(hours=3)
     return kuwait_time
 
