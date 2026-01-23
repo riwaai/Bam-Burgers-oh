@@ -17,7 +17,7 @@ load_dotenv(ROOT_DIR / '.env')
 # Kuwait timezone helper
 def get_kuwait_time():
     """Get current time in Kuwait (UTC+3)"""
-    utc_now = datetime.utcnow()
+    utc_now = get_kuwait_time()
     kuwait_time = utc_now + timedelta(hours=3)
     return kuwait_time
 
@@ -211,7 +211,7 @@ async def supabase_request(method: str, table: str, data: dict = None, params: d
 
 
 def generate_order_number():
-    now = datetime.utcnow()
+    now = get_kuwait_time()
     date_str = now.strftime('%Y%m%d')
     random_part = str(uuid.uuid4().int)[:4]
     return f"WEB-{date_str}-{random_part}"
@@ -221,11 +221,11 @@ def generate_order_number():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+    return {"status": "healthy", "timestamp": get_kuwait_time().isoformat()}
 
 @api_router.get("/health")
 async def api_health_check():
-    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+    return {"status": "healthy", "timestamp": get_kuwait_time().isoformat()}
 
 
 # ==================== ORDERS ====================
@@ -312,7 +312,7 @@ async def create_order_in_db(request: CreateOrderRequest, payment_status: str = 
             'status': 'completed',
             'transaction_id': transaction_id,
             'provider_response': provider_response,
-            'completed_at': datetime.utcnow().isoformat(),
+            'completed_at': get_kuwait_time().isoformat(),
         }
         await supabase_request('POST', 'payments', data=payment_data)
         logging.info(f"Payment record created for order {order_id}: transaction_id={transaction_id}")
@@ -331,7 +331,7 @@ async def create_order_in_db(request: CreateOrderRequest, payment_status: str = 
             
             # Update customer loyalty points
             await supabase_request('PATCH', 'customers', 
-                data={'loyalty_points': new_balance, 'updated_at': datetime.utcnow().isoformat()},
+                data={'loyalty_points': new_balance, 'updated_at': get_kuwait_time().isoformat()},
                 params={'id': f'eq.{request.customer_id}'})
             
             # Create loyalty transaction record
@@ -376,7 +376,7 @@ async def create_order_in_db(request: CreateOrderRequest, payment_status: str = 
         'id': order_id,
         'order_number': order_number,
         'status': 'pending',
-        'created_at': datetime.utcnow().isoformat(),
+        'created_at': get_kuwait_time().isoformat(),
     }
 
 
@@ -548,7 +548,7 @@ async def verify_payment_new(tap_id: Optional[str] = None, ref: Optional[str] = 
                                 'payment_status': 'paid',
                                 'status': 'pending',  # Now it's a real pending order
                                 'transaction_id': transaction_id,
-                                'updated_at': datetime.utcnow().isoformat()
+                                'updated_at': get_kuwait_time().isoformat()
                             }
                             await supabase_request('PATCH', 'orders', data=update_data, params={'id': f'eq.{charge_order_id}'})
                             logging.info(f"Order {charge_order_id} updated to paid status")
@@ -564,7 +564,7 @@ async def verify_payment_new(tap_id: Optional[str] = None, ref: Optional[str] = 
                                 'status': 'completed',
                                 'transaction_id': transaction_id,
                                 'provider_response': charge_data,
-                                'completed_at': datetime.utcnow().isoformat(),
+                                'completed_at': get_kuwait_time().isoformat(),
                             }
                             try:
                                 await supabase_request('POST', 'payments', data=payment_data)
@@ -763,9 +763,9 @@ async def update_order_status(order_id: str, request: UpdateStatusRequest):
         update_data = {'status': request.status}
         
         if request.status == 'accepted':
-            update_data['accepted_at'] = datetime.utcnow().isoformat()
+            update_data['accepted_at'] = get_kuwait_time().isoformat()
         elif request.status in ['delivered', 'completed', 'cancelled']:
-            update_data['completed_at'] = datetime.utcnow().isoformat()
+            update_data['completed_at'] = get_kuwait_time().isoformat()
         
         await supabase_request('PATCH', 'orders', data=update_data, params={'id': f'eq.{order_id}'})
         return {"success": True, "status": request.status}
@@ -855,7 +855,7 @@ async def validate_coupon(code: str, subtotal: float, customer_id: Optional[str]
         
         coupon = coupons[0]
         coupon_id = coupon['id']
-        now = datetime.utcnow()
+        now = get_kuwait_time()
         
         # Check date validity
         valid_from = coupon.get('valid_from')
